@@ -2,6 +2,7 @@ package com.example.maple.service;
 
 
 import com.example.maple.client.NexonApiClient;
+import com.example.maple.domain.JobStat;
 import com.example.maple.dto.CharacterBasicResponse;
 import com.example.maple.dto.ocid.OcidResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
@@ -62,17 +63,33 @@ public class CharacterService {
                         CharacterStatResponse.FinalStat::statValue,
                         (a, b) -> b
                 ));
-
         String criticalDamage = require(m, "크리티컬 데미지");
         String bossDamage = require(m, "보스 몬스터 데미지");
         String damage = require(m, "데미지");
+        String Finaldamage = require(m, "최종 데미지");
+        String ignoredefense = require(m, "방어율 무시");
+        String Cooldownreduction = require(m, "재사용 대기시간 감소 (초)");
+        String attackpower = require(m, "공격력");
+        String horsepower = require(m, "마력");
+
+        String job = stat.characterClass();
+        JobStat jobStat = JobStat.from(job);
+        String mainStat = m.get(jobStat.getMainStat());
+        String subStat = m.get(jobStat.getSubStat());
 
         return new DetailStatResponse(
                 name,
                 stat.characterClass(),
                 criticalDamage,
                 bossDamage,
-                damage
+                damage,
+                Finaldamage,
+                ignoredefense,
+                mainStat,
+                subStat,
+                Cooldownreduction,
+                attackpower,
+                horsepower
         );
 
     }
