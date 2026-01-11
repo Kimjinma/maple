@@ -1,6 +1,7 @@
 package com.example.maple.client;
 
 import com.example.maple.dto.CharacterBasicResponse;
+import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.ocid.OcidResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,11 +54,13 @@ public class NexonApiClient {
                     .toUri();
 
             System.out.println("BASIC URI = " + uri);
+            //System.out.println("진마야 술 좀 그만 먹어 궤짝은 오바야 간 썩어" );
+
 
             return restTemplate.getForObject(uri, CharacterBasicResponse.class);
         }
 
-        public CharacterStatResponse getStat(String ocid, String data){
+        public CharacterStatResponse getStat(String ocid){
 
             ocid = ocid == null ? null : ocid.trim();
 
@@ -68,5 +71,14 @@ public class NexonApiClient {
 
             URI uri = b.build().toUri();
             return restTemplate.getForObject(uri, CharacterStatResponse.class);
+        }
+        public ItemStat getItemStat(String ocid){
+                ocid = ocid == null ? null : ocid.trim();
+            UriComponentsBuilder c = UriComponentsBuilder
+                    .fromHttpUrl(baseUrl)
+                    .path("/maplestory/v1/character/item-equipment")
+                    .queryParam("ocid", ocid);
+            URI uri = c.build().toUri();
+            return restTemplate.getForObject(uri, ItemStat.class);
         }
 }

@@ -3,20 +3,15 @@ package com.example.maple.dto.stat;
 public record DetailStatResponse(
         String characterName,
         String characterClass,
-        String criticalDamage,  // 크리티컬 데미지
-        String bossDamage,      // 보스 공격력
-        String damage,           // 데미지
-        String Finaldamage, //최종데미지
-        String ignoredefense, //방무
-        String mainStat,
-        String subStat,
-        String Cooldownreduction,//쿨감
-        String attackpower, //공격력
-        String horsepower //마력
 
-
-
-
-
-
+        double criticalDamage,   // 크리티컬 데미지
+        double bossDamage,       // 보스 몬스터 데미지
+        double damage,           // 데미지
+        double finalDamage,      // 최종 데미지
+        double ignoreDefense,    // 방어율 무시
+        int mainStat,
+        int subStat,
+        int cooldownReduction,   // 재사용 대기시간 감소(초)
+        int attackPower,         // 공격력
+        int magicPower           // 마력
 ) {}
