@@ -4,6 +4,8 @@ package com.example.maple.service;
 import com.example.maple.client.NexonApiClient;
 import com.example.maple.domain.JobStat;
 import com.example.maple.dto.CharacterBasicResponse;
+import com.example.maple.dto.item.ItemOptionSummaryResponse;
+import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.ocid.OcidResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
 import com.example.maple.dto.stat.DetailStatResponse;
@@ -32,7 +34,7 @@ public class CharacterService {
             throw new IllegalArgumentException("ocid 조회 실패: " + name);
         }
 
-        CharacterBasicResponse basic = nexonApiClient. getBasic(ocidResponse.ocid());
+        CharacterBasicResponse basic = nexonApiClient.getBasic(ocidResponse.ocid());
 
         if (basic == null) {
             throw new IllegalArgumentException("기본정보 조회 실패: " + name);
@@ -41,7 +43,7 @@ public class CharacterService {
         return basic;
     }
 
-    public DetailStatResponse getDetailStatByName(String name, String date) {
+    public DetailStatResponse getDetailStatByName(String name) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("name이 비었습니다.");
         }
@@ -66,15 +68,15 @@ public class CharacterService {
                         (a, b) -> b
                 ));
 
-        double criticalDamage   = toDouble(require(m, "크리티컬 데미지"));
-        double bossDamage       = toDouble(require(m, "보스 몬스터 데미지"));
-        double damage           = toDouble(require(m, "데미지"));
-        double finalDamage      = toDouble(require(m, "최종 데미지"));
-        double ignoreDefense    = toDouble(require(m, "방어율 무시"));
+        double criticalDamage = toDouble(require(m, "크리티컬 데미지"));
+        double bossDamage = toDouble(require(m, "보스 몬스터 데미지"));
+        double damage = toDouble(require(m, "데미지"));
+        double finalDamage = toDouble(require(m, "최종 데미지"));
+        double ignoreDefense = toDouble(require(m, "방어율 무시"));
 
-        int cooldownReduction   = toInt(require(m, "재사용 대기시간 감소 (초)"));
-        int attackPower         = toInt(require(m, "공격력"));
-        int magicPower          = toInt(require(m, "마력")); // horsepower → magicPower 추천
+        int cooldownReduction = toInt(require(m, "재사용 대기시간 감소 (초)"));
+        int attackPower = toInt(require(m, "공격력"));
+        int magicPower = toInt(require(m, "마력")); // horsepower → magicPower 추천
 
         String job = stat.characterClass();
         JobStat jobStat = JobStat.from(job);
@@ -82,7 +84,7 @@ public class CharacterService {
 // jobStat.getMainStat()는 "STR"/"DEX" 같은 '키'를 주고,
 // m.get(...)는 그 키의 '값(문자열)'을 줍니다. → 숫자로 변환
         int mainStat = toInt(m.getOrDefault(jobStat.getMainStat(), "0"));
-        int subStat  = toInt(m.getOrDefault(jobStat.getSubStat(), "0"));
+        int subStat = toInt(m.getOrDefault(jobStat.getSubStat(), "0"));
 
         return new DetailStatResponse(
                 name,
@@ -106,6 +108,7 @@ public class CharacterService {
         if (v == null) throw new IllegalArgumentException("스탯 키 없음: " + key);
         return v;
     }
+
     private int toInt(String s) {
         if (s == null || s.isBlank()) return 0;
         return (int) Math.round(Double.parseDouble(s.trim()));
@@ -116,6 +119,32 @@ public class CharacterService {
         return Double.parseDouble(s.trim());
     }
 
+    public ItemOptionSummaryResponse getItemOptionSummary(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("name이 비었습니다.");
+        }
+        name = name.trim();
+
+        OcidResponse ocidResponse = nexonApiClient.getOcid(name);
+        if (ocidResponse == null || ocidResponse.ocid() == null) {
+            throw new IllegalArgumentException("ocid 조회 실패: " + name);
+        }
+
+        //
+        CharacterStatResponse stat = nexonApiClient.getStat(ocidResponse.ocid();
+        if (stat == null || stat.characterClass() == null) {
+            throw new IllegalArgumentException("직업 조회 실패: " + name);
+        }
+        String clazz = stat.characterClass();
+
+        ItemStat itemStat = nexonApiClient.getItemStat(ocidResponse.ocid();
+        if (itemStat == null || itemStat.itemequipment() == null) {
+            throw new IllegalArgumentException("아이템 조회 실패: " + name);
+        }
+
+        return summarizeItemOptions(name, clazz, itemStat);
+    }
 
 
 }
+

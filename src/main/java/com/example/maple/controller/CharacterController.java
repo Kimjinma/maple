@@ -1,6 +1,7 @@
 package com.example.maple.controller;
 
 import com.example.maple.dto.CharacterBasicResponse;
+import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.stat.DetailStatResponse;
 import com.example.maple.service.CharacterService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,12 @@ public class CharacterController {
     @GetMapping("/api/characters/stat")
     public DetailStatResponse stat(@RequestParam String name, @RequestParam(required = false) String date
     ) {
-        return characterService.getDetailStatByName(name, date);
+        return characterService.getDetailStatByName(name);
     }
+    @GetMapping("/api/characters/item-equipment")
+    public ItemStat item(@RequestParam String name, @RequestParam(required = false) String date
+    ) {
+        return characterService.getItemStat(name);
+    }
+
 }

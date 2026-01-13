@@ -29,6 +29,7 @@ public record ItemStat(
         public record ItemTotalOption(
                 String str,
                 String dex,
+                @JsonProperty("int")
                 String intel,
                 String luk,
                 String attack_power,
