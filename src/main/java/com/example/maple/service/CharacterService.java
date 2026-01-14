@@ -36,6 +36,7 @@ public class CharacterService {
         }
         return ocidResponse.ocid();
     }
+
     private String normalizeName(String name) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("name이 비었습니다.");
@@ -153,38 +154,52 @@ public class CharacterService {
             throw new IllegalArgumentException("아이템 조회 실패: " + name);
         }
 
-        double allStatPct = 0.0;   // "올스탯 +6%"
-        double mainStatPct = 0.0;  // 직업 메인스탯% (STR/DEX/INT/LUK 중 하나)
+        double allStatPct = 0.0;   // 올스탯% 총합
+        double mainStatPct = 0.0;  // 직업 기준 주스탯% 총합 (잠재/에디)
+        int attackPct = 0;         // 공격력% 총합 (잠재/에디)
+        int magicPct = 0;          // 마력% 총합 (잠재/에디)
 
         for (ItemStat.ItemEquipment eq : itemStat.itemequipment()) {
             if (eq == null) continue;
 
-            // 잠재
-            allStatPct += pickPct(eq.potential_option_1(), "올스탯");
-            allStatPct += pickPct(eq.potential_option_2(), "올스탯");
-            allStatPct += pickPct(eq.potential_option_3(), "올스탯");
+            // 1) 추가옵션(total_option) 올스탯%
+            if (eq.item_total_option() != null) {
+                allStatPct += toDoubleSafe(eq.item_total_option().all_stat());
+            }
 
-            mainStatPct += pickPct(eq.potential_option_1(), jobStat.getMainStat());
-            mainStatPct += pickPct(eq.potential_option_2(), jobStat.getMainStat());
-            mainStatPct += pickPct(eq.potential_option_3(), jobStat.getMainStat());
+            // 2) 잠재/에디
+            String[] lines = {
+                    eq.potential_option_1(),
+                    eq.potential_option_2(),
+                    eq.potential_option_3(),
+                    eq.additional_potential_option_1(),
+                    eq.additional_potential_option_2(),
+                    eq.additional_potential_option_3()
+            };
 
-            // 에디
-            allStatPct += pickPct(eq.additional_potential_option_1(), "올스탯");
-            allStatPct += pickPct(eq.additional_potential_option_2(), "올스탯");
-            allStatPct += pickPct(eq.additional_potential_option_3(), "올스탯");
+            for (String line : lines) {
+                // 올스탯%
+                allStatPct += pickPct(line, "올스탯");
 
-            mainStatPct += pickPct(eq.additional_potential_option_1(), jobStat.getMainStat());
-            mainStatPct += pickPct(eq.additional_potential_option_2(), jobStat.getMainStat());
-            mainStatPct += pickPct(eq.additional_potential_option_3(), jobStat.getMainStat());
+                // 주스탯%
+                mainStatPct += pickPct(line, jobStat.getMainStat());
+
+                // 공격력% / 마력%
+                attackPct += pickPctInt(line, "공격력");
+                magicPct += pickPctInt(line, "마력");
+            }
         }
+
         double mainTotal = mainStatPct + allStatPct;
+
 
         return new ItemOptionSummaryResponse(
                 name,
                 clazz,
                 mainTotal,
-                allStatPct
-
+                allStatPct,
+                attackPct,
+                magicPct
         );
 
     }
@@ -209,6 +224,25 @@ public class CharacterService {
         String num = s.replaceAll("[^0-9.+-]", "");
         if (num.isBlank()) return 0.0;
         return Double.parseDouble(num);
+    }
+
+    private int pickPctInt(String line, String key) {
+        if (line == null || key == null) return 0;
+
+        String t = line.replace(" ", "");
+        if (!t.contains(key) || !t.contains("%")) return 0;
+
+        String num = t.replaceAll("[^0-9+-]", "");
+        return num.isBlank() ? 0 : Integer.parseInt(num);
+    }
+
+    private double toDoubleSafe(String s) {
+        if (s == null || s.isBlank()) return 0.0;
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 
 }

@@ -6,5 +6,8 @@ public record ItemOptionSummaryResponse(
 
         // 직업 기준 자동 합산
         double mainStatPct,
-        double allStatPct
+        double allStatPct,
+        int attackPct,
+        int magicPct
+
 ) {}
