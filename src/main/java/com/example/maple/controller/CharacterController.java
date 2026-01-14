@@ -1,6 +1,7 @@
 package com.example.maple.controller;
 
 import com.example.maple.dto.CharacterBasicResponse;
+import com.example.maple.dto.item.ItemOptionSummaryResponse;
 import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.stat.DetailStatResponse;
 import com.example.maple.service.CharacterService;
@@ -29,9 +30,13 @@ public class CharacterController {
         return characterService.getDetailStatByName(name);
     }
     @GetMapping("/api/characters/item-equipment")
-    public ItemStat item(@RequestParam String name, @RequestParam(required = false) String date
-    ) {
+    public ItemStat itemEquipment(@RequestParam String name) {
         return characterService.getItemStat(name);
+    }
+
+    @GetMapping("/api/characters/item-option-summary")
+    public ItemOptionSummaryResponse itemOptionSummary(@RequestParam String name) {
+        return characterService.getItemOptionSummary(name);
     }
 
 }

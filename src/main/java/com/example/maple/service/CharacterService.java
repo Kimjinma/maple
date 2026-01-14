@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang3.math.NumberUtils.toDouble;
-import static org.apache.commons.lang3.math.NumberUtils.toInt;
 
 @Service
 public class CharacterService {
@@ -26,24 +24,7 @@ public class CharacterService {
     public CharacterService(NexonApiClient nexonApiClient) {
         this.nexonApiClient = nexonApiClient;
     }
-
-    public CharacterBasicResponse getBasicByName(String name) {
-        OcidResponse ocidResponse = nexonApiClient.getOcid(name);
-
-        if (ocidResponse == null || ocidResponse.ocid() == null) {
-            throw new IllegalArgumentException("ocid 조회 실패: " + name);
-        }
-
-        CharacterBasicResponse basic = nexonApiClient.getBasic(ocidResponse.ocid());
-
-        if (basic == null) {
-            throw new IllegalArgumentException("기본정보 조회 실패: " + name);
-        }
-
-        return basic;
-    }
-
-    public DetailStatResponse getDetailStatByName(String name) {
+    private String resolveOcid(String name) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("name이 비었습니다.");
         }
@@ -53,11 +34,39 @@ public class CharacterService {
         if (ocidResponse == null || ocidResponse.ocid() == null) {
             throw new IllegalArgumentException("ocid 조회 실패: " + name);
         }
-
-        CharacterStatResponse stat = nexonApiClient.getStat(ocidResponse.ocid());
-        if (stat == null || stat.finalStat() == null) {
-            throw new IllegalArgumentException("스탯 조회 실패: " + name);
+        return ocidResponse.ocid();
+    }
+    private String normalizeName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("name이 비었습니다.");
         }
+        return name.trim();
+    }
+
+    public CharacterBasicResponse getBasicByName(String name) {
+        String n = normalizeName(name);
+        String ocid = resolveOcid(n);
+
+        CharacterBasicResponse basic = nexonApiClient.getBasic(ocid);
+        if (basic == null) {
+            throw new IllegalArgumentException("기본정보 조회 실패: " + n);
+        }
+        return basic;
+    }
+
+
+    public DetailStatResponse getDetailStatByName(String name) {
+        String n = normalizeName(name);
+        String ocid = resolveOcid(n);
+
+        CharacterStatResponse stat = nexonApiClient.getStat(ocid);
+        if (stat == null || stat.finalStat() == null) {
+            throw new IllegalArgumentException("스탯 조회 실패: " + n);
+        }
+
+
+
+
 
         Map<String, String> m = stat.finalStat().stream()
                 .filter(Objects::nonNull)
@@ -118,33 +127,89 @@ public class CharacterService {
         if (s == null || s.isBlank()) return 0.0;
         return Double.parseDouble(s.trim());
     }
+    public ItemStat getItemStat(String name) {
+        String ocid = resolveOcid(name);
+
+        ItemStat itemStat = nexonApiClient.getItemStat(ocid);
+        if (itemStat == null || itemStat.itemequipment() == null) {
+            throw new IllegalArgumentException("아이템 조회 실패: " + name);
+        }
+        return itemStat;
+    }
 
     public ItemOptionSummaryResponse getItemOptionSummary(String name) {
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("name이 비었습니다.");
-        }
-        name = name.trim();
+        String ocid = resolveOcid(name);
 
-        OcidResponse ocidResponse = nexonApiClient.getOcid(name);
-        if (ocidResponse == null || ocidResponse.ocid() == null) {
-            throw new IllegalArgumentException("ocid 조회 실패: " + name);
-        }
-
-        //
-        CharacterStatResponse stat = nexonApiClient.getStat(ocidResponse.ocid();
+        CharacterStatResponse stat = nexonApiClient.getStat(ocid);
         if (stat == null || stat.characterClass() == null) {
             throw new IllegalArgumentException("직업 조회 실패: " + name);
         }
-        String clazz = stat.characterClass();
 
-        ItemStat itemStat = nexonApiClient.getItemStat(ocidResponse.ocid();
+        String clazz = stat.characterClass();
+        JobStat jobStat = JobStat.from(clazz);
+
+        ItemStat itemStat = nexonApiClient.getItemStat(ocid);
         if (itemStat == null || itemStat.itemequipment() == null) {
             throw new IllegalArgumentException("아이템 조회 실패: " + name);
         }
 
-        return summarizeItemOptions(name, clazz, itemStat);
+        double allStatPct = 0.0;   // "올스탯 +6%"
+        double mainStatPct = 0.0;  // 직업 메인스탯% (STR/DEX/INT/LUK 중 하나)
+
+        for (ItemStat.ItemEquipment eq : itemStat.itemequipment()) {
+            if (eq == null) continue;
+
+            // 잠재
+            allStatPct += pickPct(eq.potential_option_1(), "올스탯");
+            allStatPct += pickPct(eq.potential_option_2(), "올스탯");
+            allStatPct += pickPct(eq.potential_option_3(), "올스탯");
+
+            mainStatPct += pickPct(eq.potential_option_1(), jobStat.getMainStat());
+            mainStatPct += pickPct(eq.potential_option_2(), jobStat.getMainStat());
+            mainStatPct += pickPct(eq.potential_option_3(), jobStat.getMainStat());
+
+            // 에디
+            allStatPct += pickPct(eq.additional_potential_option_1(), "올스탯");
+            allStatPct += pickPct(eq.additional_potential_option_2(), "올스탯");
+            allStatPct += pickPct(eq.additional_potential_option_3(), "올스탯");
+
+            mainStatPct += pickPct(eq.additional_potential_option_1(), jobStat.getMainStat());
+            mainStatPct += pickPct(eq.additional_potential_option_2(), jobStat.getMainStat());
+            mainStatPct += pickPct(eq.additional_potential_option_3(), jobStat.getMainStat());
+        }
+        double mainTotal = mainStatPct + allStatPct;
+
+        return new ItemOptionSummaryResponse(
+                name,
+                clazz,
+                mainTotal,
+                allStatPct
+
+        );
+
+    }
+    private double pickPct(String line, String key) {
+        if (line == null || key == null) return 0.0;
+
+        String t = line.replace(" ", "");
+
+        // 올스탯
+        if (key.equals("올스탯")) {
+            if (!t.contains("올스탯") || !t.contains("%")) return 0.0;
+            return extractPercent(t);
+        }
+
+        // 주스탯 (STR/DEX/INT/LUK)
+        if (!t.contains(key) || !t.contains("%")) return 0.0;
+        return extractPercent(t);
     }
 
+    private double extractPercent(String s) {
+        // "STR+12%" -> "12"
+        String num = s.replaceAll("[^0-9.+-]", "");
+        if (num.isBlank()) return 0.0;
+        return Double.parseDouble(num);
+    }
 
 }
 
