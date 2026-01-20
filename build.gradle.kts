@@ -38,6 +38,9 @@ dependencies {
     // Test (이거 하나면 충분)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
+
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
 }
 
 tasks.test {

@@ -1,12 +1,11 @@
 package com.example.maple.service;
 
-
-import com.example.maple.client.NexonApiClient;
 import com.example.maple.domain.JobStat;
 import com.example.maple.dto.CharacterBasicResponse;
+import com.example.maple.dto.calcinput.CharacterCalcInput;
+import com.example.maple.dto.eff.EfficiencyResponse;
 import com.example.maple.dto.item.ItemOptionSummaryResponse;
 import com.example.maple.dto.item.ItemStat;
-import com.example.maple.dto.ocid.OcidResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
 import com.example.maple.dto.stat.DetailStatResponse;
 import org.springframework.stereotype.Service;
@@ -15,59 +14,32 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-
 @Service
 public class CharacterService {
 
-    private final NexonApiClient nexonApiClient;
+    private final NexonCachedService cached;
 
-    public CharacterService(NexonApiClient nexonApiClient) {
-        this.nexonApiClient = nexonApiClient;
-    }
-    private String resolveOcid(String name) {
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("name이 비었습니다.");
-        }
-        name = name.trim();
-
-        OcidResponse ocidResponse = nexonApiClient.getOcid(name);
-        if (ocidResponse == null || ocidResponse.ocid() == null) {
-            throw new IllegalArgumentException("ocid 조회 실패: " + name);
-        }
-        return ocidResponse.ocid();
+    public CharacterService(NexonCachedService cached) {
+        this.cached = cached;
     }
 
-    private String normalizeName(String name) {
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("name이 비었습니다.");
-        }
-        return name.trim();
-    }
 
     public CharacterBasicResponse getBasicByName(String name) {
-        String n = normalizeName(name);
-        String ocid = resolveOcid(n);
+        String ocid = cached.getOcid(name);
+        return cached.getBasic(ocid);
+    }
 
-        CharacterBasicResponse basic = nexonApiClient.getBasic(ocid);
-        if (basic == null) {
-            throw new IllegalArgumentException("기본정보 조회 실패: " + n);
-        }
-        return basic;
+
+    public ItemStat getItemStat(String name) {
+        String ocid = cached.getOcid(name);
+        return cached.getItem(ocid);
     }
 
 
     public DetailStatResponse getDetailStatByName(String name) {
-        String n = normalizeName(name);
-        String ocid = resolveOcid(n);
 
-        CharacterStatResponse stat = nexonApiClient.getStat(ocid);
-        if (stat == null || stat.finalStat() == null) {
-            throw new IllegalArgumentException("스탯 조회 실패: " + n);
-        }
-
-
-
-
+        String ocid = cached.getOcid(name);
+        CharacterStatResponse stat = cached.getStat(ocid);
 
         Map<String, String> m = stat.finalStat().stream()
                 .filter(Objects::nonNull)
@@ -78,23 +50,20 @@ public class CharacterService {
                         (a, b) -> b
                 ));
 
-        double criticalDamage = toDouble(require(m, "크리티컬 데미지"));
-        double bossDamage = toDouble(require(m, "보스 몬스터 데미지"));
-        double damage = toDouble(require(m, "데미지"));
-        double finalDamage = toDouble(require(m, "최종 데미지"));
-        double ignoreDefense = toDouble(require(m, "방어율 무시"));
+        double criticalDamage = toDouble(m, "크리티컬 데미지");
+        double bossDamage = toDouble(m, "보스 몬스터 데미지");
+        double damage = toDouble(m, "데미지");
+        double finalDamage = toDouble(m, "최종 데미지");
+        double ignoreDefense = toDouble(m, "방어율 무시");
 
-        int cooldownReduction = toInt(require(m, "재사용 대기시간 감소 (초)"));
-        int attackPower = toInt(require(m, "공격력"));
-        int magicPower = toInt(require(m, "마력")); // horsepower → magicPower 추천
+        int cooldownReduction = toInt(m, "재사용 대기시간 감소 (초)");
+        int attackPower = toInt(m, "공격력");
+        int magicPower = toInt(m, "마력");
 
-        String job = stat.characterClass();
-        JobStat jobStat = JobStat.from(job);
+        JobStat jobStat = JobStat.from(stat.characterClass());
+        int mainStat = toInt(m, jobStat.getMainStat());
+        int subStat  = toInt(m, jobStat.getSubStat());
 
-// jobStat.getMainStat()는 "STR"/"DEX" 같은 '키'를 주고,
-// m.get(...)는 그 키의 '값(문자열)'을 줍니다. → 숫자로 변환
-        int mainStat = toInt(m.getOrDefault(jobStat.getMainStat(), "0"));
-        int subStat = toInt(m.getOrDefault(jobStat.getSubStat(), "0"));
 
         return new DetailStatResponse(
                 name,
@@ -110,64 +79,27 @@ public class CharacterService {
                 attackPower,
                 magicPower
         );
-
     }
 
-    private String require(Map<String, String> m, String key) {
-        String v = m.get(key);
-        if (v == null) throw new IllegalArgumentException("스탯 키 없음: " + key);
-        return v;
-    }
 
-    private int toInt(String s) {
-        if (s == null || s.isBlank()) return 0;
-        return (int) Math.round(Double.parseDouble(s.trim()));
-    }
+    public ItemOptionSummaryResponse getItemOptionSummary(String name, String characterClass) {
 
-    private double toDouble(String s) {
-        if (s == null || s.isBlank()) return 0.0;
-        return Double.parseDouble(s.trim());
-    }
-    public ItemStat getItemStat(String name) {
-        String ocid = resolveOcid(name);
+        String ocid = cached.getOcid(name);
+        ItemStat itemStat = cached.getItem(ocid);
+        JobStat jobStat = JobStat.from(characterClass);
 
-        ItemStat itemStat = nexonApiClient.getItemStat(ocid);
-        if (itemStat == null || itemStat.itemequipment() == null) {
-            throw new IllegalArgumentException("아이템 조회 실패: " + name);
-        }
-        return itemStat;
-    }
-
-    public ItemOptionSummaryResponse getItemOptionSummary(String name) {
-        String ocid = resolveOcid(name);
-
-        CharacterStatResponse stat = nexonApiClient.getStat(ocid);
-        if (stat == null || stat.characterClass() == null) {
-            throw new IllegalArgumentException("직업 조회 실패: " + name);
-        }
-
-        String clazz = stat.characterClass();
-        JobStat jobStat = JobStat.from(clazz);
-
-        ItemStat itemStat = nexonApiClient.getItemStat(ocid);
-        if (itemStat == null || itemStat.itemequipment() == null) {
-            throw new IllegalArgumentException("아이템 조회 실패: " + name);
-        }
-
-        double allStatPct = 0.0;   // 올스탯% 총합
-        double mainStatPct = 0.0;  // 직업 기준 주스탯% 총합 (잠재/에디)
-        int attackPct = 0;         // 공격력% 총합 (잠재/에디)
-        int magicPct = 0;          // 마력% 총합 (잠재/에디)
+        double allStatPct = 0.0;
+        double mainStatPct = 0.0;
+        int attackPct = 0;
+        int magicPct = 0;
 
         for (ItemStat.ItemEquipment eq : itemStat.itemequipment()) {
             if (eq == null) continue;
 
-            // 1) 추가옵션(total_option) 올스탯%
             if (eq.item_total_option() != null) {
                 allStatPct += toDoubleSafe(eq.item_total_option().all_stat());
             }
 
-            // 2) 잠재/에디
             String[] lines = {
                     eq.potential_option_1(),
                     eq.potential_option_2(),
@@ -178,72 +110,107 @@ public class CharacterService {
             };
 
             for (String line : lines) {
-                // 올스탯%
                 allStatPct += pickPct(line, "올스탯");
-
-                // 주스탯%
                 mainStatPct += pickPct(line, jobStat.getMainStat());
-
-                // 공격력% / 마력%
                 attackPct += pickPctInt(line, "공격력");
                 magicPct += pickPctInt(line, "마력");
             }
         }
 
-        double mainTotal = mainStatPct + allStatPct;
-
-
         return new ItemOptionSummaryResponse(
                 name,
-                clazz,
-                mainTotal,
+                characterClass,
+                mainStatPct + allStatPct,
                 allStatPct,
                 attackPct,
                 magicPct
         );
-
     }
+
+
+    public CharacterCalcInput getCalcInput(String name) {
+
+        DetailStatResponse stat = getDetailStatByName(name);
+        ItemOptionSummaryResponse item =
+                getItemOptionSummary(name, stat.characterClass());
+
+        return new CharacterCalcInput(
+                stat.characterName(),
+                stat.characterClass(),
+                stat.finalDamage(),
+                stat.bossDamage(),
+                stat.damage(),
+                stat.ignoreDefense(),
+                stat.criticalDamage(),
+                stat.cooldownReduction(),
+                item.mainStatPct(),
+                item.allStatPct(),
+                item.attackPct(),
+                item.magicPct()
+        );
+    }
+
+
+    public EfficiencyResponse getEfficiency(String name, int baseR, int bossDef) {
+
+        // stat 1회 + item 1회 (둘 다 캐시)
+        DetailStatResponse detail = getDetailStatByName(name);
+        ItemOptionSummaryResponse item =
+                getItemOptionSummary(name, detail.characterClass());
+
+        CharacterCalcInput calc = new CharacterCalcInput(
+                detail.characterName(),
+                detail.characterClass(),
+                detail.finalDamage(),
+                detail.bossDamage(),
+                detail.damage(),
+                detail.ignoreDefense(),
+                detail.criticalDamage(),
+                detail.cooldownReduction(),
+                item.mainStatPct(),
+                item.allStatPct(),
+                item.attackPct(),
+                item.magicPct()
+        );
+
+        boolean isMage = JobStat.from(calc.characterClass()) == JobStat.MAGE;
+
+        EfficiencyCalculator calculator = new EfficiencyCalculator(bossDef);
+        return calculator.calc(calc, detail, baseR, isMage);
+    }
+
+
+    private double toDouble(Map<String, String> m, String key) {
+        return Double.parseDouble(m.getOrDefault(key, "0"));
+    }
+
+    private int toInt(Map<String, String> m, String key) {
+        return (int) Math.round(Double.parseDouble(m.getOrDefault(key, "0")));
+    }
+
     private double pickPct(String line, String key) {
         if (line == null || key == null) return 0.0;
-
         String t = line.replace(" ", "");
-
-        // 올스탯
-        if (key.equals("올스탯")) {
-            if (!t.contains("올스탯") || !t.contains("%")) return 0.0;
-            return extractPercent(t);
-        }
-
-        // 주스탯 (STR/DEX/INT/LUK)
         if (!t.contains(key) || !t.contains("%")) return 0.0;
         return extractPercent(t);
     }
 
     private double extractPercent(String s) {
-        // "STR+12%" -> "12"
         String num = s.replaceAll("[^0-9.+-]", "");
-        if (num.isBlank()) return 0.0;
-        return Double.parseDouble(num);
+        return num.isBlank() ? 0.0 : Double.parseDouble(num);
     }
 
     private int pickPctInt(String line, String key) {
         if (line == null || key == null) return 0;
-
         String t = line.replace(" ", "");
         if (!t.contains(key) || !t.contains("%")) return 0;
-
         String num = t.replaceAll("[^0-9+-]", "");
         return num.isBlank() ? 0 : Integer.parseInt(num);
     }
 
     private double toDoubleSafe(String s) {
         if (s == null || s.isBlank()) return 0.0;
-        try {
-            return Double.parseDouble(s.trim());
-        } catch (Exception e) {
-            return 0.0;
-        }
+        try { return Double.parseDouble(s.trim()); }
+        catch (Exception e) { return 0.0; }
     }
-
 }
-
