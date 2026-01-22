@@ -13,8 +13,8 @@ public record CharacterCalcInput(
         int cooldownNoApplySec,  // 재사용 대기시간 감소(초)
 
         // item 값
-        double mainStatPct,   // 주스탯% + 올스탯%까지 합산된 값
+        double mainStatPct,   // 주스탯%
         double allStatPct, //올스탯% (추가옵션 합산된 값)
-        double  attackPct, // 공%
+        double attackPct, // 공%
         double magicPct  // 마%
 ) {}

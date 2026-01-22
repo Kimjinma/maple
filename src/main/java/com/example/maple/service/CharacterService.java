@@ -120,7 +120,7 @@ public class CharacterService {
         return new ItemOptionSummaryResponse(
                 name,
                 characterClass,
-                mainStatPct + allStatPct,
+                mainStatPct ,
                 allStatPct,
                 attackPct,
                 magicPct
@@ -173,9 +173,9 @@ public class CharacterService {
                 item.magicPct()
         );
 
-        boolean isMage = JobStat.from(calc.characterClass()) == JobStat.MAGE;
+        boolean isMage = JobStat.from(calc.characterClass()).usesMagic();
 
-        EfficiencyCalculator calculator = new EfficiencyCalculator(bossDef);
+        EfficiencyCalculatorV3 calculator = new EfficiencyCalculatorV3(bossDef);
         return calculator.calc(calc, detail, baseR, isMage);
     }
 

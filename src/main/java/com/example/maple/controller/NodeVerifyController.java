@@ -7,7 +7,7 @@ import com.example.maple.dto.eff.EfficiencyResponse;
 import com.example.maple.dto.stat.DetailStatResponse;
 import com.example.maple.repository.UpgradeNodeRepository;
 import com.example.maple.service.CharacterService;
-import com.example.maple.service.EfficiencyCalculator;
+import com.example.maple.service.EfficiencyCalculatorV3;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -58,7 +58,7 @@ public class NodeVerifyController {
         double linearGain = breakdown.values().stream().mapToDouble(Double::doubleValue).sum();
 
         // 4) 실제 재계산 (power 기반)
-        EfficiencyCalculator calculator = new EfficiencyCalculator(bossDef);
+        EfficiencyCalculatorV3 calculator = new EfficiencyCalculatorV3(bossDef);
         double actualGain = calculator.calcActualGainForNode(
                 calc, detail, r, isMage,
                 n.getDeltaBossPct(),
