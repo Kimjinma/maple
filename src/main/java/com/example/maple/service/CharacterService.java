@@ -23,18 +23,15 @@ public class CharacterService {
         this.cached = cached;
     }
 
-
     public CharacterBasicResponse getBasicByName(String name) {
         String ocid = cached.getOcid(name);
         return cached.getBasic(ocid);
     }
 
-
     public ItemStat getItemStat(String name) {
         String ocid = cached.getOcid(name);
         return cached.getItem(ocid);
     }
-
 
     public DetailStatResponse getDetailStatByName(String name) {
 
@@ -47,8 +44,7 @@ public class CharacterService {
                 .collect(Collectors.toMap(
                         s -> s.statName().trim(),
                         s -> s.statValue() == null ? "0" : s.statValue().trim(),
-                        (a, b) -> b
-                ));
+                        (a, b) -> b));
 
         double criticalDamage = toDouble(m, "크리티컬 데미지");
         double bossDamage = toDouble(m, "보스 몬스터 데미지");
@@ -62,25 +58,24 @@ public class CharacterService {
 
         JobStat jobStat = JobStat.from(stat.characterClass());
         int mainStat = toInt(m, jobStat.getMainStat());
-        int subStat  = toInt(m, jobStat.getSubStat());
-
+        int subStat = toInt(m, jobStat.getSubStat());
+        int combatPower = toInt(m, "전투력");
 
         return new DetailStatResponse(
                 name,
                 stat.characterClass(),
-                criticalDamage,
-                bossDamage,
-                damage,
+                criticalDamage + DopingConstants.CRIT_DMG_PCT,
+                bossDamage + DopingConstants.BOSS_PCT,
+                damage + DopingConstants.DAMAGE_PCT,
                 finalDamage,
                 ignoreDefense,
                 mainStat,
                 subStat,
                 cooldownReduction,
-                attackPower,
-                magicPower
-        );
+                attackPower + DopingConstants.ATK_FLAT,
+                magicPower + DopingConstants.ATK_FLAT,
+                combatPower);
     }
-
 
     public ItemOptionSummaryResponse getItemOptionSummary(String name, String characterClass) {
 
@@ -93,11 +88,16 @@ public class CharacterService {
         int attackPct = 0;
         int magicPct = 0;
 
-        for (ItemStat.ItemEquipment eq : itemStat.itemequipment()) {
-            if (eq == null) continue;
+        java.util.Map<String, ItemOptionSummaryResponse.SlotOption> slotOptions = new java.util.HashMap<>();
 
+        for (ItemStat.ItemEquipment eq : itemStat.itemequipment()) {
+            if (eq == null)
+                continue;
+
+            double itemAllPct = 0;
             if (eq.item_total_option() != null) {
-                allStatPct += toDoubleSafe(eq.item_total_option().all_stat());
+                itemAllPct = toDoubleSafe(eq.item_total_option().all_stat());
+                allStatPct += itemAllPct;
             }
 
             String[] lines = {
@@ -109,30 +109,93 @@ public class CharacterService {
                     eq.additional_potential_option_3()
             };
 
+            double itemMainPct = 0;
+            int itemAtkPct = 0;
+            int itemMagPct = 0;
+
             for (String line : lines) {
-                allStatPct += pickPct(line, "올스탯");
-                mainStatPct += pickPct(line, jobStat.getMainStat());
-                attackPct += pickPctInt(line, "공격력");
-                magicPct += pickPctInt(line, "마력");
+                double a = pickPct(line, "올스탯");
+                double m = pickPct(line, jobStat.getMainStat());
+                int ap = pickPctInt(line, "공격력");
+                int mp = pickPctInt(line, "마력");
+
+                itemAllPct += a;
+                itemMainPct += m;
+                itemAtkPct += ap;
+                itemMagPct += mp;
+
+                allStatPct += a;
+                mainStatPct += m;
+                attackPct += ap;
+                magicPct += mp;
             }
+
+            // 개별 슬롯 정보 저장
+            int itemMainFlat = 0;
+            int itemAtkFlat = 0;
+            int itemMagFlat = 0;
+            double itemBoss = 0;
+            double itemDmg = 0;
+            double itemIed = 0;
+
+            if (eq.item_total_option() != null) {
+                itemMainFlat = toIntFromStr(jobStat.getMainStat(), eq.item_total_option());
+                itemAtkFlat = toIntSafe(eq.item_total_option().attack_power());
+                itemMagFlat = toIntSafe(eq.item_total_option().magic_power());
+                itemBoss = toDoubleSafe(eq.item_total_option().boss_damage());
+                itemDmg = toDoubleSafe(eq.item_total_option().damage());
+                itemIed = toDoubleSafe(eq.item_total_option().ignore_monster_armor());
+            }
+
+            slotOptions.put(eq.item_equipment_slot(), new ItemOptionSummaryResponse.SlotOption(
+                    eq.item_name(),
+                    itemMainPct + itemAllPct,
+                    itemMainFlat,
+                    itemAtkFlat,
+                    itemMagFlat,
+                    itemAtkPct,
+                    itemMagPct,
+                    itemBoss,
+                    itemDmg,
+                    itemIed,
+                    0.0 // CritDmg (API total option usually zero for items)
+            ));
         }
 
         return new ItemOptionSummaryResponse(
                 name,
                 characterClass,
-                mainStatPct ,
+                mainStatPct,
                 allStatPct,
-                attackPct,
-                magicPct
-        );
+                (int) (attackPct + DopingConstants.ATK_PCT),
+                (int) (magicPct + DopingConstants.ATK_PCT),
+                slotOptions);
     }
 
+    private int toIntFromStr(String statName, ItemStat.ItemEquipment.ItemTotalOption opt) {
+        return switch (statName) {
+            case "STR" -> toIntSafe(opt.str());
+            case "DEX" -> toIntSafe(opt.dex());
+            case "INT" -> toIntSafe(opt.intel());
+            case "LUK" -> toIntSafe(opt.luk());
+            default -> 0;
+        };
+    }
+
+    private int toIntSafe(String s) {
+        if (s == null || s.isBlank())
+            return 0;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
 
     public CharacterCalcInput getCalcInput(String name) {
 
         DetailStatResponse stat = getDetailStatByName(name);
-        ItemOptionSummaryResponse item =
-                getItemOptionSummary(name, stat.characterClass());
+        ItemOptionSummaryResponse item = getItemOptionSummary(name, stat.characterClass());
 
         return new CharacterCalcInput(
                 stat.characterName(),
@@ -146,17 +209,14 @@ public class CharacterService {
                 item.mainStatPct(),
                 item.allStatPct(),
                 item.attackPct(),
-                item.magicPct()
-        );
+                item.magicPct());
     }
-
 
     public EfficiencyResponse getEfficiency(String name, int baseR, int bossDef) {
 
         // stat 1회 + item 1회 (둘 다 캐시)
         DetailStatResponse detail = getDetailStatByName(name);
-        ItemOptionSummaryResponse item =
-                getItemOptionSummary(name, detail.characterClass());
+        ItemOptionSummaryResponse item = getItemOptionSummary(name, detail.characterClass());
 
         CharacterCalcInput calc = new CharacterCalcInput(
                 detail.characterName(),
@@ -170,15 +230,13 @@ public class CharacterService {
                 item.mainStatPct(),
                 item.allStatPct(),
                 item.attackPct(),
-                item.magicPct()
-        );
+                item.magicPct());
 
         boolean isMage = JobStat.from(calc.characterClass()).usesMagic();
 
         EfficiencyCalculatorV3 calculator = new EfficiencyCalculatorV3(bossDef);
         return calculator.calc(calc, detail, baseR, isMage);
     }
-
 
     private double toDouble(Map<String, String> m, String key) {
         return Double.parseDouble(m.getOrDefault(key, "0"));
@@ -189,9 +247,11 @@ public class CharacterService {
     }
 
     private double pickPct(String line, String key) {
-        if (line == null || key == null) return 0.0;
+        if (line == null || key == null)
+            return 0.0;
         String t = line.replace(" ", "");
-        if (!t.contains(key) || !t.contains("%")) return 0.0;
+        if (!t.contains(key) || !t.contains("%"))
+            return 0.0;
         return extractPercent(t);
     }
 
@@ -201,16 +261,22 @@ public class CharacterService {
     }
 
     private int pickPctInt(String line, String key) {
-        if (line == null || key == null) return 0;
+        if (line == null || key == null)
+            return 0;
         String t = line.replace(" ", "");
-        if (!t.contains(key) || !t.contains("%")) return 0;
+        if (!t.contains(key) || !t.contains("%"))
+            return 0;
         String num = t.replaceAll("[^0-9+-]", "");
         return num.isBlank() ? 0 : Integer.parseInt(num);
     }
 
     private double toDoubleSafe(String s) {
-        if (s == null || s.isBlank()) return 0.0;
-        try { return Double.parseDouble(s.trim()); }
-        catch (Exception e) { return 0.0; }
+        if (s == null || s.isBlank())
+            return 0.0;
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 }

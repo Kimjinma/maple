@@ -60,4 +60,15 @@ public class NexonCachedService {
         }
         return item;
     }
+
+    @Cacheable(cacheNames = "setEffect", key = "#ocid")
+    public com.example.maple.dto.seteffect.SetEffectResponse getSetEffect(String ocid) {
+        com.example.maple.dto.seteffect.SetEffectResponse all = nexonApiClient.getSetEffect(ocid);
+        if (all == null || all.setEffect() == null) {
+            // throw new IllegalArgumentException("세트효과 조회 실패: " + ocid);
+            // 세트효과 없을 수도 있음? -> 일단 리턴
+            return all;
+        }
+        return all;
+    }
 }

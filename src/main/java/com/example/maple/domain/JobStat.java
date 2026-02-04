@@ -4,34 +4,32 @@ import lombok.Getter;
 
 public enum JobStat {
 
-    WARRIOR(
-            new String[]{"히어로", "팔라딘", "다크나이트", "데몬슬레이어", "아란", "카이저","제로","소울마스터","아델","미하일","블래스터",
-                    "렌","스트라이커","은월","아크","바이퍼","캐논슈터"},
-            "STR", "DEX",
-            AtkType.ATTACK
-    ),
     MAGE(
-            new String[]{"배틀메이지", "비숍", "아크메이지(불,독)", "아크메이지(썬,콜)", "루미너스", "일리움","라라","에반","플레임위자드","키네시스"},
+            new String[] { "배틀메이지", "비숍", "아크메이지(불,독)", "아크메이지(썬,콜)", "루미너스", "일리움", "라라", "에반", "플레임위자드", "키네시스"
+                     },
             "INT", "LUK",
-            AtkType.MAGIC
-    ),
+            AtkType.MAGIC),
+    WARRIOR(
+            new String[] { "히어로", "팔라딘", "다크나이트", "데몬슬레이어", "아란", "카이저", "제로", "소울마스터", "아델", "미하일", "블래스터",
+                    "스트라이커", "은월", "아크", "바이퍼", "캐논슈터","렌" },
+            "STR", "DEX",
+            AtkType.ATTACK),
     THIEF(
-            new String[]{"나이트로드", "섀도어", "듀얼블레이드", "팬텀","호영","칼리","나이트워커"},
+            new String[] { "나이트로드", "섀도어", "듀얼블레이더", "팬텀", "호영", "칼리", "나이트워커", "카데나" },
             "LUK", "DEX",
-            AtkType.ATTACK
-    ),
+            AtkType.ATTACK),
     ARCHER(
-            new String[]{"보우마스터", "신궁", "패스파인더", "윈드브레이커","카인","와일드헌터","메르세데스"},
+            new String[] { "보우마스터", "신궁", "패스파인더", "윈드브레이커", "카인", "와일드헌터", "메르세데스" },
             "DEX", "STR",
-            AtkType.ATTACK
-    ),
+            AtkType.ATTACK),
     PIRATE(
-            new String[]{ "캡틴", "엔젤릭버스터","메카닉"},
+            new String[] { "캡틴", "엔젤릭버스터", "메카닉" },
             "DEX", "STR",
-            AtkType.ATTACK
-    );
+            AtkType.ATTACK);
 
-    public enum AtkType { ATTACK, MAGIC }
+    public enum AtkType {
+        ATTACK, MAGIC
+    }
 
     private final String[] jobNames;
 

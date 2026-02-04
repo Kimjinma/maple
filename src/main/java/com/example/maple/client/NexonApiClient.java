@@ -3,6 +3,7 @@ package com.example.maple.client;
 import com.example.maple.dto.CharacterBasicResponse;
 import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.ocid.OcidResponse;
+import com.example.maple.dto.seteffect.SetEffectResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,69 +17,79 @@ import java.nio.charset.StandardCharsets;
 
 public class NexonApiClient {
 
-        private final RestTemplate restTemplate;
-        private final String baseUrl;
+    private final RestTemplate restTemplate;
+    private final String baseUrl;
 
-        public NexonApiClient(RestTemplate nexonRestTemplate,
-                              @Value("${nexon.api.base-url}") String baseUrl) {
-            this.restTemplate = nexonRestTemplate;
-            this.baseUrl = baseUrl;
+    public NexonApiClient(RestTemplate nexonRestTemplate,
+            @Value("${nexon.api.base-url}") String baseUrl) {
+        this.restTemplate = nexonRestTemplate;
+        this.baseUrl = baseUrl;
+    }
+
+    public OcidResponse getOcid(String characterName) {
+        if (characterName == null || characterName.trim().isEmpty()) {
+            throw new IllegalArgumentException("characterName이 비었습니다.");
         }
+        characterName = characterName.trim();
 
-        public OcidResponse getOcid(String characterName) {
-            if (characterName == null || characterName.trim().isEmpty()) {
-                throw new IllegalArgumentException("characterName이 비었습니다.");
-            }
-            characterName = characterName.trim();
+        URI url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl)
+                .path("/maplestory/v1/id")
+                .queryParam("character_name", characterName)
+                .build()
+                .encode(StandardCharsets.UTF_8)
+                .toUri();
 
-            URI url = UriComponentsBuilder
-                    .fromHttpUrl(baseUrl)
-                    .path("/maplestory/v1/id")
-                    .queryParam("character_name", characterName)
-                    .build()
-                    .encode(StandardCharsets.UTF_8)
-                    .toUri();
+        return restTemplate.getForObject(url, OcidResponse.class);
+    }
 
+    public CharacterBasicResponse getBasic(String ocid) {
+        ocid = ocid == null ? null : ocid.trim();
 
-            return restTemplate.getForObject(url, OcidResponse.class);
-        }
+        URI uri = UriComponentsBuilder
+                .fromHttpUrl(baseUrl)
+                .path("/maplestory/v1/character/basic")
+                .queryParam("ocid", ocid)
+                .build()
+                .toUri();
 
-        public CharacterBasicResponse getBasic(String ocid) {
-            ocid = ocid == null ? null : ocid.trim();
+        System.out.println("BASIC URI = " + uri);
+        // System.out.println("진마야 술 좀 그만 먹어 궤짝은 오바야 간 썩어" );
 
-            URI uri = UriComponentsBuilder
-                    .fromHttpUrl(baseUrl)
-                    .path("/maplestory/v1/character/basic")
-                    .queryParam("ocid", ocid)
-                    .build()
-                    .toUri();
+        return restTemplate.getForObject(uri, CharacterBasicResponse.class);
+    }
 
-            System.out.println("BASIC URI = " + uri);
-            //System.out.println("진마야 술 좀 그만 먹어 궤짝은 오바야 간 썩어" );
+    public CharacterStatResponse getStat(String ocid) {
 
+        ocid = ocid == null ? null : ocid.trim();
 
-            return restTemplate.getForObject(uri, CharacterBasicResponse.class);
-        }
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromHttpUrl(baseUrl)
+                .path("/maplestory/v1/character/stat")
+                .queryParam("ocid", ocid);
 
-        public CharacterStatResponse getStat(String ocid){
+        URI uri = b.build().toUri();
+        return restTemplate.getForObject(uri, CharacterStatResponse.class);
+    }
 
-            ocid = ocid == null ? null : ocid.trim();
+    public ItemStat getItemStat(String ocid) {
+        ocid = ocid == null ? null : ocid.trim();
+        UriComponentsBuilder c = UriComponentsBuilder
+                .fromHttpUrl(baseUrl)
+                .path("/maplestory/v1/character/item-equipment")
+                .queryParam("ocid", ocid);
+        URI uri = c.build().toUri();
+        return restTemplate.getForObject(uri, ItemStat.class);
+    }
 
-            UriComponentsBuilder b = UriComponentsBuilder
-                    .fromHttpUrl(baseUrl)
-                    .path("/maplestory/v1/character/stat")
-                    .queryParam("ocid", ocid);
-
-            URI uri = b.build().toUri();
-            return restTemplate.getForObject(uri, CharacterStatResponse.class);
-        }
-        public ItemStat getItemStat(String ocid){
-                ocid = ocid == null ? null : ocid.trim();
-            UriComponentsBuilder c = UriComponentsBuilder
-                    .fromHttpUrl(baseUrl)
-                    .path("/maplestory/v1/character/item-equipment")
-                    .queryParam("ocid", ocid);
-            URI uri = c.build().toUri();
-            return restTemplate.getForObject(uri, ItemStat.class);
-        }
+    public SetEffectResponse getSetEffect(String ocid) {
+        ocid = ocid == null ? null : ocid.trim();
+        URI uri = UriComponentsBuilder
+                .fromHttpUrl(baseUrl)
+                .path("/maplestory/v1/character/set-effect")
+                .queryParam("ocid", ocid)
+                .build()
+                .toUri();
+        return restTemplate.getForObject(uri, SetEffectResponse.class);
+    }
 }
