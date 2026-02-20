@@ -1,0 +1,49 @@
+프로젝트 소개
+  넥슨(Nexon) Open API를 활용해 내 캐릭터의 현재 스펙을 분석하고, 한정된 예산 내에서 스펙업 효율이 가장 좋은 장비 세팅을 추천해 주는 백엔드 서비스입니다.
+
+  '가진 자본으로 어떤 아이템부터 바꾸는 게 가장 스펙업이 많이 될까?'라는 유저들의 실제 고민에서 출발했습니다. 단순히 좋은 아이템을 나열하는 것을 넘어, 배낭 문제(Knapsack Problem) 알고리즘을 응용해 (상승 스탯 / 소모 비용) 효율이 가장 높은 최적의 아이템 조합을 계산합니다.
+
+기술 스택
+  - Backend: Java 17, Spring Boot, Spring Data JPA
+
+  - Database & Cache: MySQL / H2, Spring Cache (@Cacheable)
+
+  - Infra/DevOps: AWS EC2, Docker
+
+  - External API: Nexon Open API
+
+주요 기능 및 고민한 점
+ 1. 내 캐릭터 기준 스탯 가치 동적 계산
+
+  넥슨 API로 전투력, 주스탯, 보스 데미지 등 100여 가지 스펙 데이터를 파싱해 객체화합니다.
+
+  유저마다 '주스탯 1%'나 '공격력 1'이 올려주는 전투력 상승치가 다릅니다. 이를 해결하기 위해 현재 스펙 기준으로 서로 다른 옵션들을 동일한 지표(환산 점수)로 비교할 수 있도록 계산 로직을 직접 구현했습니다.
+
+ 2. 가성비 기반 장비 추천 알고리즘 설계
+
+  장착 가능한 장비 데이터(DB) 중 가격 대비 점수 상승량이 가장 높은 아이템을 우선 선별합니다.
+
+  예산 범위 내에서 최적해를 찾다가 중간에 멈춰버리는 현상(Local Maxima)을 방지하기 위해, 알고리즘 후반부에 특정 조건에서 강제로 상위 장비를 탐색해 고점을 뚫는(Forced Upgrade) 예외 로직을 추가해 추천 정확도를 높였습니다.
+
+ 3. 외부 API 의존성 극복 (캐싱 적용)
+
+  넥슨 API를 매번 호출하면 속도 제한(Rate Limit)에 걸리거나 페이지 로딩이 느려지는 문제가 있었습니다.
+
+  이를 해결하기 위해 Spring의 @Cacheable을 이용한 인메모리 캐싱을 도입하여 불필요한 API 호출을 줄이고 응답 속도를 개선했습니다.
+
+  외부 API 장애 시 서버 전체가 죽지 않도록 Global Exception Handler를 구성해 안정성을 높였습니다.
+
+
+배포 및 실행 방법
+ AWS EC2 환경에서 Docker를 이용해 구동 및 배포합니다.
+(로컬 실행 시 application.yml에 Nexon API Key 및 DB 정보 설정이 필요합니다.)
+
+Bash
+ 1. 프로젝트 빌드
+  ./gradlew clean build -x test
+
+ 2. Docker 이미지 빌드
+  docker build -t maple-recommender .
+
+ 3. 컨테이너 백그라운드 실행
+  docker run -d -p 8080:8080 maple-recommender
