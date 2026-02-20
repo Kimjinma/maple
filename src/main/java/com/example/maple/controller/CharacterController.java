@@ -22,7 +22,7 @@ public class CharacterController {
 
     @GetMapping("/api/characters/basic")
     public CharacterBasicResponse basic(@RequestParam String name) {
-        return characterService.getBasicByName(name); // ✅ wrapper로 다시 제공
+        return characterService.getBasicByName(name); //
     }
 
     @GetMapping("/api/characters/stat")
@@ -35,7 +35,7 @@ public class CharacterController {
 
     @GetMapping("/api/characters/item-equipment")
     public ItemStat itemEquipment(@RequestParam String name) {
-        return characterService.getItemStat(name); // ✅ wrapper로 다시 제공
+        return characterService.getItemStat(name); //
     }
 
     @GetMapping("/api/characters/item-option-summary")

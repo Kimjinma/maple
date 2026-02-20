@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,21 +38,22 @@ public class RecommendationService {
         List<UpgradeNode> allNodes = upgradeNodeRepository.findAll();
 
         // 4. 세트 효과 프리셋 로드
-        List<SetEffectPreset> presets = setEffectPresetRepository.findAll();
+        List<SetEffectPreset> allPresets = setEffectPresetRepository.findAll();
+        List<SetEffectPreset> armorPresets = allPresets.stream().filter(p -> isArmorPreset(p.getName()))
+                .collect(Collectors.toList());
 
-        RecommendationResult bestArmorResult = null;
-        RecommendationResult bestAccessoryResult = null;
-        double maxArmorScore = -1;
-        long minArmorCost = Long.MAX_VALUE;
-        double maxAccessoryScore = -1;
-        long minAccessoryCost = Long.MAX_VALUE;
+        boolean hasEthernal = armorPresets.stream().anyMatch(p -> p.getName().contains("에테"));
+        if (!hasEthernal) {
+            armorPresets.add(new SetEffectPreset("3에테 5아케인 여명 보장", 0, 0, 0, 0, 0, 0, 0, 0));
+        }
 
-        // 직업별 등
+        List<SetEffectPreset> accessoryPresets = allPresets.stream().filter(p -> isAccessoryPreset(p.getName()))
+                .collect(Collectors.toList());
+
         JobStat jobStat = JobStat.from(basic.characterClass());
         boolean usesMagic = jobStat.usesMagic();
         int baseR = currentScore;
 
-        // 5. 현재 착용 아이템 정보
         ItemOptionSummaryResponse itemSummary = characterService.getItemOptionSummary(characterName,
                 basic.characterClass());
         Map<String, ItemOptionSummaryResponse.SlotOption> currentItems = new HashMap<>();
@@ -59,7 +61,6 @@ public class RecommendationService {
             itemSummary.slotOptions().forEach((k, v) -> currentItems.put(k.replace(" ", ""), v));
         }
 
-        // 6. 현재 세트 효과 점수 추정 (분리 계산)
         Map<String, Long> currentCounts = new HashMap<>();
         currentItems.values().forEach(opt -> {
             String setName = ItemSetClassifier.classify(opt.itemName());
@@ -68,218 +69,250 @@ public class RecommendationService {
             }
         });
 
-        double currentArmorScore = getBestArmorScore(currentCounts, presets, basicInput, detail, baseR, usesMagic);
-        double currentAccessoryScore = getBestAccessoryScore(currentCounts, presets, basicInput, detail, baseR,
-                usesMagic);
-        double currentSetScore = currentArmorScore + currentAccessoryScore;
+        int currentArmorTier = 0;
+        if (currentCounts.getOrDefault("ETHERNEL", 0L) >= 1)
+            currentArmorTier = 4;
+        else if (currentCounts.getOrDefault("ARCANE", 0L) >= 1)
+            currentArmorTier = 3;
+        else if (currentCounts.getOrDefault("ABSO", 0L) >= 1)
+            currentArmorTier = 2;
+        else if (currentCounts.getOrDefault("ROOT_ABYSS", 0L) >= 1)
+            currentArmorTier = 1;
 
-        // 7. 노드 전처리
+        double currentArmorScore = getBestArmorScore(currentCounts, allPresets, basicInput, detail, baseR, usesMagic);
+        double currentAccessoryScore = getBestAccessoryScore(currentCounts, allPresets, basicInput, detail, baseR,
+                usesMagic);
+        double currentTotalSetScore = currentArmorScore + currentAccessoryScore;
+
         List<ProcessedNode> processedNodes = preProcessNodes(allNodes, basicInput, detail, baseR, currentItems,
                 usesMagic);
 
-        // 8. 프리셋 별 시뮬레이션
-        for (SetEffectPreset preset : presets) {
-            boolean isArmor = isArmorPreset(preset.getName());
-            boolean isAccessory = isAccessoryPreset(preset.getName());
+        RecommendationResult bestResult = null;
+        double maxSimulatedScore = -1;
+        long minCost = Long.MAX_VALUE;
 
-            if (!isArmor && !isAccessory)
+        for (SetEffectPreset armorPreset : armorPresets) {
+
+            int presetTier = 0;
+            if (armorPreset.getName().contains("에테"))
+                presetTier = 4;
+            else if (armorPreset.getName().contains("아케인"))
+                presetTier = 3;
+            else if (armorPreset.getName().contains("앱솔"))
+                presetTier = 2;
+            else if (armorPreset.getName().contains("루타") || armorPreset.getName().contains("카루타"))
+                presetTier = 1;
+
+            if (presetTier < currentArmorTier) {
                 continue;
+            }
 
-            List<String> allowedSets = ItemSetClassifier.getAllowedSets(preset.getName());
-            List<ProcessedNode> filteredCandidates = processedNodes;
-            if (allowedSets != null) {
-                filteredCandidates = processedNodes.stream()
+            for (SetEffectPreset accPreset : accessoryPresets) {
+
+                List<String> allowedArmorSets = ItemSetClassifier.getAllowedSets(armorPreset.getName());
+                List<String> allowedAccSets = ItemSetClassifier.getAllowedSets(accPreset.getName());
+
+                Set<String> combinedAllowedSets = new HashSet<>();
+                combinedAllowedSets.addAll(allowedArmorSets);
+                combinedAllowedSets.addAll(allowedAccSets);
+
+                List<ProcessedNode> filteredCandidates = processedNodes.stream()
                         .filter(pn -> {
                             String set = ItemSetClassifier.classify(pn.node().getItemName());
-                            return allowedSets.contains(set);
+
+                            boolean isMajorSet = set.equals("ROOT_ABYSS") || set.equals("ABSO") || set.equals("ARCANE")
+                                    || set.equals("ETHERNEL");
+
+                            if (isMajorSet) {
+
+                                return combinedAllowedSets.contains(set);
+                            }
+
+                            if (!combinedAllowedSets.isEmpty()) {
+                                return combinedAllowedSets.contains(set);
+                            }
+
+                            return true;
                         })
                         .collect(Collectors.toList());
-            }
 
-            double potentialTargetSetScore = calculateSetScore(preset, basicInput, detail, baseR, usesMagic);
-            double relevantCurrentScore = isArmor ? currentArmorScore : currentAccessoryScore;
-            double expectedSetDelta = Math.max(0, potentialTargetSetScore - relevantCurrentScore);
-            final double bonusPerItem = expectedSetDelta / 6.0;
+                double targetArmorSetScore = calculateSetScore(armorPreset, basicInput, detail, baseR, usesMagic);
+                double targetAccSetScore = calculateSetScore(accPreset, basicInput, detail, baseR, usesMagic);
 
-            double currentGap = targetScore - currentScore;
+                double expectedSetDelta = Math.max(0, (targetArmorSetScore + targetAccSetScore) - currentTotalSetScore);
 
-            List<ProcessedNode> prioritizedCandidates = new ArrayList<>();
-            if (filteredCandidates != null) {
-                // Find min cost per item name to identify "Base" items (entry level set items)
-                Map<String, Long> minCostMap = filteredCandidates.stream()
-                        .collect(Collectors.toMap(
-                                pn -> pn.node().getItemName(),
-                                pn -> pn.node().getCostMeso(),
-                                (c1, c2) -> Math.min(c1, c2)));
+                final double bonusPerItem = expectedSetDelta / 10.0; // roughly 10 items involved
 
-                prioritizedCandidates = filteredCandidates.stream()
-                        .map(pn -> {
-                            String itemName = pn.node().getItemName();
-                            String itemSet = ItemSetClassifier.classify(itemName);
-                            boolean isKeyItem = false;
-                            if (isAccessory) {
-                                if (preset.getName().contains("칠흑") && itemSet.equals("PITCH_BOSS"))
-                                    isKeyItem = true;
-                                if (preset.getName().contains("여명") && itemSet.equals("DAWN_BOSS"))
-                                    isKeyItem = true;
-                                if (preset.getName().contains("보장") && itemSet.equals("BOSS_ACC"))
-                                    isKeyItem = true;
-                            }
-                            if (isArmor) {
-                                if (preset.getName().contains("아케인") && itemSet.equals("ARCANE"))
-                                    isKeyItem = true;
-                                if (preset.getName().contains("앱솔") && itemSet.equals("ABSO"))
-                                    isKeyItem = true;
-                                if (preset.getName().contains("에테") && itemSet.equals("ETHERNEL"))
-                                    isKeyItem = true;
-                                if (preset.getName().contains("루타") && itemSet.equals("ROOT_ABYSS"))
-                                    isKeyItem = true;
-                            }
+                double currentGap = targetScore - currentScore;
 
-                            // Only apply bonus to the lowest cost version (Base Item) to prioritize entry,
-                            // but let Starforce upgrades compete on raw efficiency.
-                            boolean isBase = pn.node().getCostMeso() == minCostMap.getOrDefault(itemName,
-                                    Long.MAX_VALUE);
+                List<ProcessedNode> prioritizedCandidates = new ArrayList<>();
+                if (!filteredCandidates.isEmpty()) {
 
-                            if (isKeyItem && isBase) {
-                                return new ProcessedNode(pn.node(), pn.gainScore() + bonusPerItem,
-                                        pn.dBoss(), pn.dAtkPct(), pn.dMainPct(), pn.dDmg(), pn.dIed(), pn.dCdmg(),
-                                        pn.dCooldown(), pn.dMainFlat(), pn.dAtkOrMag(), pn.appliedSlot());
-                            } else {
+                    prioritizedCandidates = filteredCandidates.stream()
+                            .map(pn -> {
+                                String itemName = pn.node().getItemName();
+                                String itemSet = ItemSetClassifier.classify(itemName);
+
+                                boolean isTargetSet = false;
+                                if (isArmorPreset(armorPreset.getName())) {
+                                    if (armorPreset.getName().contains("아케인") && itemSet.equals("ARCANE"))
+                                        isTargetSet = true;
+                                    else if (armorPreset.getName().contains("앱솔") && itemSet.equals("ABSO"))
+                                        isTargetSet = true;
+                                    else if (armorPreset.getName().contains("에테") && itemSet.equals("ETHERNEL"))
+                                        isTargetSet = true;
+                                    else if (armorPreset.getName().contains("루타") && itemSet.equals("ROOT_ABYSS"))
+                                        isTargetSet = true;
+                                }
+
+                                if (isAccessoryPreset(accPreset.getName())) {
+                                    if (accPreset.getName().contains("칠흑") && itemSet.equals("PITCH_BOSS"))
+                                        isTargetSet = true;
+                                    else if (accPreset.getName().contains("여명") && itemSet.equals("DAWN_BOSS"))
+                                        isTargetSet = true;
+                                    else if (accPreset.getName().contains("보장") && itemSet.equals("BOSS_ACC"))
+                                        isTargetSet = true;
+                                    else if (accPreset.getName().contains("마이") && itemSet.equals("MYSTERIOUS"))
+                                        isTargetSet = true;
+                                }
+
+                                if (isTargetSet) {
+                                    return new ProcessedNode(pn.node(), pn.gainScore() + bonusPerItem,
+                                            pn.dBoss(), pn.dAtkPct(), pn.dMainPct(), pn.dDmg(), pn.dIed(), pn.dCdmg(),
+                                            pn.dCooldown(), pn.dMainFlat(), pn.dAtkOrMag(), pn.appliedSlot());
+                                }
                                 return pn;
+                            })
+                            .collect(Collectors.toList());
+                }
+
+                long nodeCost = 0;
+                List<ProcessedNode> selectedProcessedNodes = new ArrayList<>();
+
+                if (currentGap > 0) {
+                    Function<List<ProcessedNode>, Double> setGainCalculator = (selectedNodes) -> {
+                        Map<String, ItemOptionSummaryResponse.SlotOption> finalItemMap = simulateFinalItems(
+                                currentItems, selectedNodes);
+                        Map<String, Long> finalCounts = new HashMap<>();
+                        finalItemMap.values().forEach(opt -> {
+                            String setName = ItemSetClassifier.classify(opt.itemName());
+                            if (!setName.equals("NONE")) {
+                                finalCounts.put(setName, finalCounts.getOrDefault(setName, 0L) + 1);
                             }
-                        })
+                        });
+
+                        ItemOptionSummaryResponse.SlotOption weapon = finalItemMap.get("무기");
+                        if (weapon == null && finalItemMap.containsKey("Weapon"))
+                            weapon = finalItemMap.get("Weapon");
+
+                        if (weapon != null && weapon.itemName().contains("제네시스")) {
+                            if (finalCounts.getOrDefault("ROOT_ABYSS", 0L) >= 3)
+                                finalCounts.put("ROOT_ABYSS", finalCounts.get("ROOT_ABYSS") + 1);
+
+                            if (finalCounts.getOrDefault("ETHERNEL", 0L) >= 3)
+                                finalCounts.put("ETHERNEL", finalCounts.get("ETHERNEL") + 1);
+
+                            if (finalCounts.getOrDefault("ARCANE", 0L) >= 3)
+                                finalCounts.put("ARCANE", finalCounts.get("ARCANE") + 1);
+
+                            if (finalCounts.getOrDefault("ABSO", 0L) >= 3)
+                                finalCounts.put("ABSO", finalCounts.get("ABSO") + 1);
+                        }
+
+                        boolean armorSatisfied = isSatisfied(armorPreset.getName(), finalCounts);
+                        boolean accSatisfied = isSatisfied(accPreset.getName(), finalCounts);
+
+                        double gain = 0;
+                        if (armorSatisfied)
+                            gain += Math.max(0, targetArmorSetScore - currentArmorScore);
+                        if (accSatisfied)
+                            gain += Math.max(0, targetAccSetScore - currentAccessoryScore);
+
+                        return gain;
+                    };
+
+                    List<ProcessedNode> boostedSelection = solveKnapsack(prioritizedCandidates, currentGap, basicInput,
+                            detail, baseR, usesMagic, setGainCalculator);
+
+                    for (ProcessedNode boosted : boostedSelection) {
+                        ProcessedNode original = processedNodes.stream()
+                                .filter(p -> p.node().getId().equals(boosted.node().getId())
+                                        && p.appliedSlot().equals(boosted.appliedSlot()))
+                                .findFirst().orElse(null);
+                        if (original != null)
+                            selectedProcessedNodes.add(original);
+                    }
+                    nodeCost = selectedProcessedNodes.stream().mapToLong(pn -> pn.node.getCostMeso()).sum();
+                }
+
+                List<UpgradeNode> selectedNodes = selectedProcessedNodes.stream().map(ProcessedNode::node)
                         .collect(Collectors.toList());
-            }
 
-            long nodeCost = 0;
-            List<ProcessedNode> selectedProcessedNodes = new ArrayList<>();
+                double nodeGainSum = calculateAggregateNodeGain(selectedNodes, processedNodes, basicInput, detail,
+                        baseR, usesMagic);
+                Map<String, ItemOptionSummaryResponse.SlotOption> finalItemMap = simulateFinalItems(currentItems,
+                        selectedProcessedNodes);
+                Map<String, Long> finalCounts = new HashMap<>();
+                finalItemMap.values().forEach(opt -> {
+                    String setName = ItemSetClassifier.classify(opt.itemName());
+                    if (!setName.equals("NONE"))
+                        finalCounts.put(setName, finalCounts.getOrDefault(setName, 0L) + 1);
+                });
 
-            if (currentGap > 0) {
-                List<ProcessedNode> boostedSelection = solveKnapsack(prioritizedCandidates, currentGap, basicInput,
-                        detail, baseR, usesMagic);
-                for (ProcessedNode boosted : boostedSelection) {
-                    ProcessedNode original = processedNodes.stream()
-                            .filter(p -> p.node().getId().equals(boosted.node().getId())
-                                    && p.appliedSlot().equals(boosted.appliedSlot()))
-                            .findFirst().orElse(null);
-                    if (original != null)
-                        selectedProcessedNodes.add(original);
+                double achievedSetScore = 0;
+                if (isSatisfied(armorPreset.getName(), finalCounts))
+                    achievedSetScore += calculateSetScore(armorPreset, basicInput, detail, baseR, usesMagic);
+                else
+                    achievedSetScore += currentArmorScore;
+
+                if (isSatisfied(accPreset.getName(), finalCounts))
+                    achievedSetScore += calculateSetScore(accPreset, basicInput, detail, baseR, usesMagic);
+                else
+                    achievedSetScore += currentAccessoryScore;
+
+                double realSetEffectDelta = achievedSetScore - currentTotalSetScore;
+                double finalSimulatedScore = currentScore + realSetEffectDelta + nodeGainSum;
+
+                RecommendationResult result = new RecommendationResult(
+                        armorPreset.getName() + " + " + accPreset.getName(),
+                        selectedNodes, nodeCost, (long) finalSimulatedScore, finalSimulatedScore >= targetScore);
+
+                boolean replace = false;
+                if (bestResult == null) {
+                    replace = true;
+                } else {
+                    boolean newSatisfies = finalSimulatedScore >= targetScore;
+                    boolean oldSatisfies = bestResult.simulatedScore() >= targetScore;
+
+                    if (newSatisfies && oldSatisfies) {
+                        if (nodeCost < minCost)
+                            replace = true;
+                        else if (nodeCost == minCost && finalSimulatedScore > maxSimulatedScore)
+                            replace = true;
+                    } else if (newSatisfies && !oldSatisfies) {
+                        replace = true;
+                    } else if (!newSatisfies && oldSatisfies) {
+                        replace = false;
+                    } else {
+                        if (finalSimulatedScore > maxSimulatedScore)
+                            replace = true;
+                    }
                 }
-                nodeCost = selectedProcessedNodes.stream().mapToLong(pn -> pn.node.getCostMeso()).sum();
-            }
 
-            List<UpgradeNode> selectedNodes = selectedProcessedNodes.stream().map(ProcessedNode::node)
-                    .collect(Collectors.toList());
-
-            double nodeGainSum = calculateAggregateNodeGain(selectedNodes, processedNodes, basicInput, detail, baseR,
-                    usesMagic);
-
-            Map<String, ItemOptionSummaryResponse.SlotOption> finalItemMap = simulateFinalItems(currentItems,
-                    selectedProcessedNodes);
-            Map<String, Long> finalCounts = new HashMap<>();
-            finalItemMap.values().forEach(opt -> {
-                String setName = ItemSetClassifier.classify(opt.itemName());
-                if (!setName.equals("NONE")) {
-                    finalCounts.put(setName, finalCounts.getOrDefault(setName, 0L) + 1);
-                }
-            });
-
-            double achievedTargetScore = 0;
-            if (isSatisfied(preset.getName(), finalCounts)) {
-                achievedTargetScore = calculateSetScore(preset, basicInput, detail, baseR, usesMagic);
-            }
-
-            double achievedTotalSetScore;
-            if (isArmor) {
-                achievedTotalSetScore = achievedTargetScore + currentAccessoryScore;
-            } else {
-                achievedTotalSetScore = achievedTargetScore + currentArmorScore;
-            }
-
-            double realSetEffectDelta = achievedTotalSetScore - currentSetScore;
-            double finalSimulatedScore = currentScore + realSetEffectDelta + nodeGainSum;
-
-            RecommendationResult result = new RecommendationResult(preset.getName(), selectedNodes, nodeCost,
-                    (long) finalSimulatedScore, finalSimulatedScore >= targetScore);
-
-            if (isArmor) {
-                if (finalSimulatedScore > maxArmorScore) {
-                    maxArmorScore = finalSimulatedScore;
-                    minArmorCost = nodeCost;
-                    bestArmorResult = result;
-                } else if (finalSimulatedScore == maxArmorScore && nodeCost < minArmorCost) {
-                    maxArmorScore = finalSimulatedScore;
-                    minArmorCost = nodeCost;
-                    bestArmorResult = result;
-                } else if (bestArmorResult == null) {
-                    bestArmorResult = result;
-                }
-            } else if (isAccessory) {
-                if (finalSimulatedScore > maxAccessoryScore) {
-                    maxAccessoryScore = finalSimulatedScore;
-                    minAccessoryCost = nodeCost;
-                    bestAccessoryResult = result;
-                } else if (finalSimulatedScore == maxAccessoryScore && nodeCost < minAccessoryCost) {
-                    maxAccessoryScore = finalSimulatedScore;
-                    minAccessoryCost = nodeCost;
-                    bestAccessoryResult = result;
-                } else if (bestAccessoryResult == null) {
-                    bestAccessoryResult = result;
+                if (replace) {
+                    maxSimulatedScore = finalSimulatedScore;
+                    minCost = nodeCost;
+                    bestResult = result;
                 }
             }
         }
 
-        // Combine Best Results
-        List<UpgradeNode> combinedNodes = new ArrayList<>();
-        long combinedCost = 0;
-        String combinedName = "";
-
-        if (bestArmorResult != null) {
-            combinedNodes.addAll(bestArmorResult.requiredItems());
-            combinedCost += bestArmorResult.totalCost();
-            combinedName += bestArmorResult.recommendedSetName();
-        }
-        if (bestAccessoryResult != null) {
-            if (bestArmorResult != null) {
-                // Check if Accessory overrides Armor slots (should not, but safety)
-                // Or if combined cost is too high? No constraint given.
-            }
-            combinedNodes.addAll(bestAccessoryResult.requiredItems());
-            combinedCost += bestAccessoryResult.totalCost();
-            if (!combinedName.isEmpty())
-                combinedName += " + ";
-            combinedName += bestAccessoryResult.recommendedSetName();
+        if (bestResult == null) {
+            return new RecommendationResult("유지", Collections.emptyList(), 0, (long) currentScore, true);
         }
 
-        if (combinedNodes.isEmpty()) {
-            return new RecommendationResult("현재 장비 유지", Collections.emptyList(), 0, (long) currentScore, true);
-        }
-
-        // Final Score Recalculation (Robust)
-        // Since we merged best armor and best accessory plans, and they operate on
-        // disjoint sets,
-        // the total score gain is roughly sum of gains.
-        // But to be precise, we re-simulated. But re-simulation logic needs
-        // ProcessedNodes.
-        // We can approximate safely:
-        double finalScore = currentScore;
-        if (bestArmorResult != null)
-            finalScore += (bestArmorResult.simulatedScore() - currentScore);
-        if (bestAccessoryResult != null)
-            finalScore += (bestAccessoryResult.simulatedScore() - currentScore);
-
-        // Note: The above approximation assumes the baseline (currentScore) is removed
-        // from both, so we add delta.
-        // BestResult.Final = Base + Delta. => Delta = Final - Base.
-        // Total = Base + DeltaArmor + DeltaAcc.
-        // Correct.
-
-        return new RecommendationResult(combinedName.isEmpty() ? "유지" : combinedName, combinedNodes, combinedCost,
-                (long) finalScore, finalScore >= targetScore);
+        return bestResult;
     }
-
-    // --- Helper Logic ---
 
     private double getBestArmorScore(Map<String, Long> counts, List<SetEffectPreset> presets,
             CharacterCalcInput input, DetailStatResponse detail, int baseR, boolean usesMagic) {
@@ -290,7 +323,6 @@ public class RecommendationService {
                 .mapToDouble(p -> calculateSetScore(p, input, detail, baseR, usesMagic))
                 .max().orElse(0.0);
 
-        // Manual Calculation for mixed sets fallback
         double manualScore = 0;
         if (counts.getOrDefault("ROOT_ABYSS", 0L) >= 3) {
             manualScore += efficiencyCalculator.calcActualGainForNode(input, detail, baseR, usesMagic,
@@ -322,7 +354,6 @@ public class RecommendationService {
                 .mapToDouble(p -> calculateSetScore(p, input, detail, baseR, usesMagic))
                 .max().orElse(0.0);
 
-        // Manual Calculation for disjoint sets (Pitch/Dawn/Boss)
         double pitchScore = 0;
         long pitchCount = counts.getOrDefault("PITCH_BOSS", 0L);
         if (pitchCount >= 8)
@@ -370,10 +401,15 @@ public class RecommendationService {
     }
 
     private List<ProcessedNode> solveKnapsack(List<ProcessedNode> nodes, double targetGap,
-            CharacterCalcInput input, DetailStatResponse detail, int baseR, boolean usesMagic) {
+            CharacterCalcInput input, DetailStatResponse detail, int baseR, boolean usesMagic,
+            Function<List<ProcessedNode>, Double> setGainCalculator) {
 
         Map<String, List<ProcessedNode>> alternativesBySlot = nodes.stream()
                 .collect(Collectors.groupingBy(pn -> pn.appliedSlot));
+
+        alternativesBySlot.forEach((slot, list) -> {
+            list.sort(Comparator.comparingDouble(ProcessedNode::gainScore));
+        });
 
         Map<String, Integer> currentChoice = new HashMap<>();
         alternativesBySlot.keySet().forEach(k -> currentChoice.put(k, -1));
@@ -388,19 +424,50 @@ public class RecommendationService {
                     .collect(Collectors.toList());
 
             double itemGain = calculateAggregateNodeGain(currentNodes, nodes, input, detail, baseR, usesMagic);
+            double setGain = setGainCalculator.apply(currentSelected);
 
-            if (itemGain >= targetGap)
+            if (itemGain + setGain >= targetGap)
                 break;
 
             String bestSlot = null;
             double bestEff = -1;
+            int bestNextIndex = -1;
 
             for (String slot : alternativesBySlot.keySet()) {
                 List<ProcessedNode> candidates = alternativesBySlot.get(slot);
                 int currentIndex = currentChoice.get(slot);
 
-                if (currentIndex + 1 < candidates.size()) {
-                    ProcessedNode next = candidates.get(currentIndex + 1);
+                int nextIndex = -1;
+                for (int i = currentIndex + 1; i < candidates.size(); i++) {
+                    ProcessedNode candidate = candidates.get(i);
+                    String candidateName = candidate.node.getItemName();
+
+                    boolean isDuplicate = false;
+                    for (Map.Entry<String, Integer> entry : currentChoice.entrySet()) {
+                        String otherSlot = entry.getKey();
+                        int otherIdx = entry.getValue();
+
+                        if (otherSlot.equals(slot))
+                            continue;
+
+                        if (otherIdx != -1) {
+                            ProcessedNode otherSelected = alternativesBySlot.get(otherSlot).get(otherIdx);
+                            if (otherSelected.node.getItemName().replace(" ", "")
+                                    .equals(candidateName.replace(" ", ""))) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!isDuplicate) {
+                        nextIndex = i;
+                        break;
+                    }
+                }
+
+                if (nextIndex != -1) {
+                    ProcessedNode next = candidates.get(nextIndex);
                     ProcessedNode current = (currentIndex == -1) ? null : candidates.get(currentIndex);
 
                     double gainDiff = next.gainScore - (current == null ? 0 : current.gainScore);
@@ -413,13 +480,61 @@ public class RecommendationService {
                     if (eff > bestEff && gainDiff > 0) {
                         bestEff = eff;
                         bestSlot = slot;
+                        bestNextIndex = nextIndex;
                     }
                 }
             }
 
-            if (bestSlot == null)
-                break;
-            currentChoice.put(bestSlot, currentChoice.get(bestSlot) + 1);
+            if (bestSlot == null) {
+                // [FIX] 효율(Efficiency) 기반으로 더 이상 고를 게 없지만, 목표 점수엔 도달 못했을 경우
+                // "가성비는 나쁘지만 점수는 확실히 오르는" 아이템(고점 갱신)을 찾아서 강제로 뚫어줍니다.
+                if (itemGain + setGain < targetGap) {
+                    for (String slot : alternativesBySlot.keySet()) {
+                        List<ProcessedNode> candidates = alternativesBySlot.get(slot);
+                        int currentIndex = currentChoice.get(slot);
+
+                        // 현재 선택된 것보다 '점수(Gain)'가 더 높은 게 있는지 확인 (가성비 무시)
+                        for (int i = candidates.size() - 1; i > currentIndex; i--) {
+                            ProcessedNode candidate = candidates.get(i);
+                            ProcessedNode current = (currentIndex == -1) ? null : candidates.get(currentIndex);
+
+                            // 중복 체크
+                            String candidateName = candidate.node.getItemName();
+                            boolean isDuplicate = false;
+                            for (Map.Entry<String, Integer> entry : currentChoice.entrySet()) {
+                                if (entry.getKey().equals(slot))
+                                    continue;
+                                if (entry.getValue() != -1) {
+                                    ProcessedNode other = alternativesBySlot.get(entry.getKey()).get(entry.getValue());
+                                    if (other.node.getItemName().replace(" ", "")
+                                            .equals(candidateName.replace(" ", ""))) {
+                                        isDuplicate = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isDuplicate)
+                                continue;
+
+                            // 단순히 점수가 오르면 바로 선택 (Best Gain)
+                            double gainDiff = candidate.gainScore - (current == null ? 0 : current.gainScore);
+                            if (gainDiff > 0) {
+                                bestSlot = slot;
+                                bestNextIndex = i;
+                                // 제일 쎈 놈 하나 찾았으면 바로 탈출 (가장 큰 상승폭 하나만 적용)
+                                break;
+                            }
+                        }
+                        if (bestSlot != null)
+                            break;
+                    }
+                }
+
+                // 그래도 없으면 진짜 끝
+                if (bestSlot == null)
+                    break;
+            }
+            currentChoice.put(bestSlot, bestNextIndex);
         }
 
         return currentChoice.entrySet().stream()
@@ -484,7 +599,10 @@ public class RecommendationService {
         public double efficiency() {
             if (node.getCostMeso() == 0)
                 return Double.MAX_VALUE;
-            return gainScore / node.getCostMeso();
+
+            double eff = gainScore / node.getCostMeso();
+
+            return eff;
         }
     }
 
@@ -498,7 +616,7 @@ public class RecommendationService {
             List<String> targetSlots = new ArrayList<>();
             String rawSlot = node.getSlot().replace(" ", "");
 
-            if (rawSlot.equals("반지") || rawSlot.equals("링")) {
+            if (rawSlot.equals("반지")) {
                 targetSlots.add("반지1");
                 targetSlots.add("반지2");
                 targetSlots.add("반지3");
@@ -525,27 +643,31 @@ public class RecommendationService {
                 double cBoss = 0, cAtkPct = 0, cMainPct = 0, cDmg = 0, cIed = 0, cCdmg = 0, cAll = 0;
                 int cCool = 0, cFlatM = 0, cFlatA = 0;
 
+                ItemOptionSummaryResponse.SlotOption cur = null;
                 if (currentItems != null) {
-                    var cur = currentItems.get(ts);
-                    if (cur != null) {
-                        cBoss = cur.bossDamage();
-                        cAtkPct = usesMagic ? cur.magicPct() : cur.attackPct();
-                        cMainPct = cur.mainStatPct();
-                        cDmg = cur.damage();
-                        cIed = cur.ignoreDefense();
-                        cFlatM = cur.mainStat();
-                        cFlatA = usesMagic ? cur.magicPower() : cur.attackPower();
-                    }
+                    cur = findCurrentItem(currentItems, ts);
+                }
+
+                if (cur != null) {
+                    cBoss = cur.bossDamage();
+                    cAtkPct = usesMagic ? cur.magicPct() : cur.attackPct();
+                    cMainPct = cur.mainStatPct();
+                    cDmg = cur.damage();
+                    cIed = cur.ignoreDefense();
+                    cFlatM = cur.mainStat();
+                    cFlatA = usesMagic ? cur.magicPower() : cur.attackPower();
                 }
 
                 double totalNodeMainPct = nMainPct + nAll;
                 double dMain = totalNodeMainPct - cMainPct;
+
                 double dBoss = nBoss - cBoss;
                 double dAtkPct = nAtkPct - cAtkPct;
                 double dDmg = nDmg - cDmg;
                 double dIed = nIed - cIed;
                 double dCdmg = nCdmg - cCdmg;
                 double dCool = nCool - cCool;
+
                 double dFlatM = nFlatM - cFlatM;
                 double dFlatA = nFlatA - cFlatA;
 
@@ -559,9 +681,10 @@ public class RecommendationService {
         }
 
         return result.stream()
-                .filter(pn -> pn.gainScore() > 0)
-                .sorted(Comparator.comparingDouble(ProcessedNode::efficiency).reversed())
-                .collect(Collectors.toList());
+                // .filter(pn -> pn.gainScore() > 0) // [FIX] 마이너스 이득(스탯 하락)이라도 세트 효과 때문에 필요할 수
+                // 있음
+                .sorted(Comparator.comparingDouble(ProcessedNode::efficiency).reversed()).collect(Collectors.toList());
+
     }
 
     private double calculateSetScore(SetEffectPreset preset, CharacterCalcInput input, DetailStatResponse detail,
@@ -625,5 +748,56 @@ public class RecommendationService {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private ItemOptionSummaryResponse.SlotOption findCurrentItem(
+            Map<String, ItemOptionSummaryResponse.SlotOption> currentItems, String slotKey) {
+        if (currentItems.containsKey(slotKey))
+            return currentItems.get(slotKey);
+
+        String normalized = slotKey.replace(" ", "").trim();
+        if (currentItems.containsKey(normalized))
+            return currentItems.get(normalized);
+
+        List<String> aliases = getSlotAliases(normalized);
+        for (String alias : aliases) {
+            String nAlias = alias.replace(" ", "");
+            if (currentItems.containsKey(nAlias))
+                return currentItems.get(nAlias);
+        }
+        return null;
+    }
+
+    private List<String> getSlotAliases(String slot) {
+        if (slot.equals("반지"))
+            return List.of("반지1", "반지2", "반지3", "반지4");
+        if (slot.equals("펜던트"))
+            return List.of("펜던트", "펜던트2");
+
+        // Armor Variants (Korean Only)
+        if (slot.equals("상의"))
+            return List.of("상의", "옷(상의)");
+        if (slot.equals("하의"))
+            return List.of("하의", "옷(하의)", "바지");
+        if (slot.equals("모자"))
+            return List.of("모자");
+        if (slot.equals("얼굴장식"))
+            return List.of("얼굴장식");
+        if (slot.equals("눈장식"))
+            return List.of("눈장식");
+        if (slot.equals("귀고리"))
+            return List.of("귀고리");
+        if (slot.equals("벨트"))
+            return List.of("벨트");
+        if (slot.equals("신발"))
+            return List.of("신발");
+        if (slot.equals("장갑"))
+            return List.of("장갑");
+        if (slot.equals("어깨장식") || slot.equals("견장"))
+            return List.of("어깨장식", "견장");
+        if (slot.equals("망토"))
+            return List.of("망토");
+
+        return List.of();
     }
 }

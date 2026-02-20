@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Maple Spec Calculator</title>
+    <style>
+        body {
+            background-color: #222;
+            color: #eee;
+            font-family: 'Noto Sans KR', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: #333;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            width: 400px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #ffcc00;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #444;
+            color: #fff;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            background: #ffcc00;
+            /* 메이플 대표 색상 느낌 */
+            color: #222;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #eebb00;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>🍁 스펙 업그레이드 계산기</h2>
+        <div th:if="${errorMessage}" style="color: #ff6b6b; margin-bottom: 15px; font-weight: bold;">
+            ⚠️ <span th:text="${errorMessage}">오류 메시지</span>
+        </div>
+        <form action="/calculator/result" method="post">
+            <div class="form-group">
+                <label for="name">캐릭터 닉네임</label>
+                <input type="text" id="name" name="name" placeholder="닉네임을 입력하세요" required>
+            </div>
+            <div class="form-group">
+                <label for="currentScore">현재 환산 점수</label>
+                <input type="number" id="currentScore" name="currentScore" placeholder="예: 50000" required>
+            </div>
+            <div class="form-group">
+                <label for="targetScore">목표 환산 점수</label>
+                <input type="number" id="targetScore" name="targetScore" placeholder="예: 60000" required>
+            </div>
+            <button type="submit">계산 시작</button>
+        </form>
+    </div>
+
+</body>
+
+</html>

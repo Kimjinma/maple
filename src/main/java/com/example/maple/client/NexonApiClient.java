@@ -53,9 +53,6 @@ public class NexonApiClient {
                 .build()
                 .toUri();
 
-        System.out.println("BASIC URI = " + uri);
-        // System.out.println("진마야 술 좀 그만 먹어 궤짝은 오바야 간 썩어" );
-
         return restTemplate.getForObject(uri, CharacterBasicResponse.class);
     }
 

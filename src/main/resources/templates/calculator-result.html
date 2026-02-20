@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Calculation Result</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ccc;
+            font-family: 'Noto Sans KR', sans-serif;
+            padding: 20px;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 20px;
+        }
+
+        .summary-box {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            display: inline-block;
+            text-align: left;
+        }
+
+        .result-val {
+            color: #ffcc00;
+            font-weight: bold;
+        }
+
+        /* 아이템 그리드 */
+        .item-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* === 복붙: 메이플 툴팁 스타일 === */
+        .maple-tooltip {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #555;
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Malgun Gothic', 'Dotum', sans-serif;
+            font-size: 12px;
+            width: 280px;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .starforce-area {
+            text-align: center;
+            margin-bottom: 5px;
+            min-height: 15px;
+        }
+
+        .star {
+            color: #ffcc00;
+            font-size: 10px;
+            letter-spacing: -1px;
+            text-shadow: 0 0 2px #ffaa00;
+        }
+
+        .item-name {
+            font-weight: bold;
+            font-size: 15px;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .item-rank {
+            font-size: 11px;
+            color: #ccff00;
+            /* 레전드리 */
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .item-image-box {
+            border: 2px solid #aaa;
+            border-radius: 4px;
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 10px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(to bottom, #777, #333);
+            position: relative;
+        }
+
+        .slot-label {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 9px;
+            color: #ddd;
+        }
+
+        .stat-section {
+            border-bottom: 1px dashed #777;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+
+        .stat-row {
+            margin-bottom: 3px;
+            line-height: 1.2;
+        }
+
+        .stat-val {
+            color: #66ccff;
+        }
+
+        .potential-section {
+            padding-top: 5px;
+        }
+
+        .pot-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .pot-rank-icon {
+            display: inline-block;
+            background: #ccff00;
+            color: #000;
+            border-radius: 3px;
+            width: 14px;
+            height: 14px;
+            text-align: center;
+            line-height: 14px;
+            font-weight: bold;
+            font-size: 10px;
+            margin-right: 5px;
+            border: 1px solid #fff;
+        }
+
+        .pot-title {
+            color: #ccff00;
+            font-weight: bold;
+        }
+
+        .pot-line {
+            padding-left: 2px;
+            margin-bottom: 2px;
+            color: #fff;
+        }
+
+        /* 에디셔널 섹션 */
+        .additional-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #777;
+        }
+
+        .addi-rank-icon {
+            display: inline-block;
+            background: #9A55FF;
+            /* 에디셔널 에픽 색상 (보라색) */
+            color: #000;
+            border-radius: 3px;
+            width: 14px;
+            height: 14px;
+            text-align: center;
+            line-height: 14px;
+            font-weight: bold;
+            font-size: 10px;
+            margin-right: 5px;
+            border: 1px solid #fff;
+        }
+
+        .addi-title {
+            color: #66ccff;
+            font-weight: bold;
+        }
+
+        .addi-line {
+            padding-left: 2px;
+            margin-bottom: 2px;
+            color: #fff;
+        }
+
+        .star-spacer {
+            display: inline-block;
+            width: 8px;
+        }
+
+        .starforce-container {
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .item-name {
+            font-weight: bold;
+            font-size: 15px;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header-section">
+        <h1>추천 장비 세팅 결과</h1>
+        <div class="summary-box">
+            <p>적용 세트: <span class="result-val" th:text="${result.recommendedSetName}"></span></p>
+            <p>예상 비용: <span class="result-val" th:text="${result.formattedTotalCost}">0메소</span></p>
+            <p>예상 환산: <span class="result-val" th:text="${result.simulatedScore}"></span></p>
+        </div>
+        <br><br>
+        <a href="/calculator"><button style="padding:10px; cursor:pointer;">다시 계산하기</button></a>
+    </div>
+
+    <!-- 아이템 목록 (카드형) -->
+    <div class="item-grid">
+        <div th:each="node : ${result.requiredItems}" class="maple-tooltip">
+
+            <!-- 1. 별/이름 -->
+            <div class="starforce-area">
+                <div class="starforce-container">
+                    <th:block th:each="i : ${#numbers.sequence(1, node.starforce)}" th:if="${node.starforce > 0}">
+                        <span class="star">★</span>
+                        <span class="star-spacer" th:if="${i % 5 == 0 && i % 15 != 0}"></span>
+                        <br th:if="${i % 15 == 0}" />
+                    </th:block>
+                </div>
+            </div>
+            <!-- [수정] 기술적인 정보가 섞인 node.name 대신 itemName + starforce 로 깔끔하게 표시 -->
+            <div class="item-name" th:text="${node.itemName} + ' ' + ${node.starforce} + '성'">거대한 공포 17성</div>
+            <!-- <div class="item-rank"
+                th:text="'(' + (node.potentialRank == 'L' ? '레전드리' : (node.potentialRank == 'U' ? '유니크' : (node.potentialRank == 'E' ? '에픽' : '레어'))) + ' 아이템)'">
+            </div> -->
+
+            <!-- 2. 이미지 -->
+            <div class="item-image-box">
+                <img th:if="${node.imageUrl != null}" th:src="${node.imageUrl}" alt="Item Icon"
+                    style="max-width:100%; max-height:100%;" />
+                <span th:if="${node.imageUrl == null}" style="font-size:10px; color:#fff;"
+                    th:text="${node.slot}">RING</span>
+            </div>
+
+            <!-- 3. 기본 스탯 -->
+            <div class="stat-section">
+                <div class="stat-row">장비분류 : <span th:text="${node.slot}"></span></div>
+
+                <!-- 주스탯 (직업에 따라 INT/STR 등 동적 표시) -->
+                <div class="stat-row" th:if="${node.tMainStatFlat > 0}">
+                    <span th:text="${mainStatName}">STR</span> : <span class="stat-val"
+                        th:text="'+' + ${node.tMainStatFlat}">+0</span>
+                </div>
+
+                <!-- 공격력/마력 (직업에 따라 공/마 동적 표시) -->
+                <div class="stat-row" th:if="${node.tAtkFlat > 0}">
+                    <span th:text="${atkOrMagName}">공격력</span> : <span class="stat-val"
+                        th:text="'+' + ${node.tAtkFlat}">+0</span>
+                </div>
+                <div class="stat-row" th:if="${node.tMagicFlat > 0 and node.tAtkFlat == 0}">
+                    <span th:text="${atkOrMagName}">마력</span> : <span class="stat-val"
+                        th:text="'+' + ${node.tMagicFlat}">+0</span>
+                </div>
+                <!-- [추가] 아이템 개별 가격 -->
+                <div class="stat-row"
+                    style="margin-top:8px; padding-top:8px; border-top:1px dashed #555; color: #ffcc00;">
+                    가격 : <span th:text="${T(com.example.maple.util.MesoFormatter).format(node.costMeso)}">0 메소</span>
+                </div>
+            </div>
+
+            <!-- 4. 잠재능력 -->
+            <div class="potential-section">
+                <div class="pot-header">
+                    <span class="pot-rank-icon" th:text="${node.potentialRank ?: 'L'}">L</span>
+                    <span class="pot-title">잠재옵션</span>
+                </div>
+
+                <!-- [NEW] UI Field Based Display (장갑 제외, DB값 존재 시) -->
+                <th:block th:if="${node.slot != '장갑' and node.uiPotentialMainStats != null}">
+                    <div class="pot-line" th:each="val : ${#strings.arraySplit(node.uiPotentialMainStats, ',')}">
+                        <span th:text="${mainStatName}">STR</span> : <span th:text="'+' + ${val} + '%'">+0%</span>
+                    </div>
+                </th:block>
+
+                <!-- [OLD] Fallback Display (장갑 or DB값 없음) -->
+                <th:block th:unless="${node.slot != '장갑' and node.uiPotentialMainStats != null}">
+                    <div class="pot-line" th:if="${node.tMainStatPct > 0}">
+                        <span th:text="${mainStatName}">STR</span> : <span
+                            th:text="'+' + ${#numbers.formatDecimal(node.tMainStatPct, 1, 0)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tAllStatPct > 0}">
+                        올스탯 : <span th:text="'+' + ${#numbers.formatDecimal(node.tAllStatPct, 1, 0)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tAtkPct > 0 or node.tMagicPct > 0}">
+                        <span th:text="${atkOrMagName}">공격력</span>% : <span
+                            th:text="'+' + ${#numbers.formatDecimal(node.tAtkPct + node.tMagicPct, 1, 0)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tBossPct > 0}">
+                        보스 몬스터 공격 시 데미지 : <span
+                            th:text="'+' + ${#numbers.formatDecimal(node.tBossPct, 1, 0)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tIedPct > 0}">
+                        몬스터 방어율 무시 : <span
+                            th:text="'+' + ${#numbers.formatDecimal(node.tIedPct, 1, 0)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tCdmgPct > 0}">
+                        크리티컬 데미지 : <span th:text="'+' + ${#numbers.formatDecimal(node.tCdmgPct, 1, 1)} + '%'">+0%</span>
+                    </div>
+                    <div class="pot-line" th:if="${node.tCooldownSec > 0}">
+                        쿨타임 감소 : <span th:text="'-' + ${node.tCooldownSec} + '초'">-0초</span>
+                    </div>
+                </th:block>
+            </div>
+
+            <!-- 5. 에디셔널 잠재능력 -->
+            <div class="additional-section"
+                th:if="${node.additionalRank != null or node.tAtkFlat > 0 or node.tMagicFlat > 0 or node.uiAdditionalAtk != null}">
+                <div class="pot-header">
+                    <span class="addi-rank-icon" th:text="${node.additionalRank ?: 'E'}">E</span>
+                    <span class="addi-title">에디셔널 잠재옵션</span>
+                </div>
+
+                <!-- [NEW] UI Based Display -->
+                <th:block th:if="${node.uiAdditionalAtk != null or node.uiAdditionalMainStatPct != null}">
+                    <div class="addi-line" th:if="${node.uiAdditionalAtk != null and node.uiAdditionalAtk > 0}">
+                        <span th:text="${atkOrMagName}">공격력</span> : +<span th:text="${node.uiAdditionalAtk}"></span>
+                    </div>
+                    <div class="addi-line"
+                        th:if="${node.uiAdditionalMainStatPct != null and node.uiAdditionalMainStatPct > 0}">
+                        <span th:text="${mainStatName}">STR</span> : +<span
+                            th:text="${node.uiAdditionalMainStatPct} + '%'"></span>
+                    </div>
+                </th:block>
+
+                <!-- [OLD] Fallback -->
+                <th:block th:unless="${node.uiAdditionalAtk != null or node.uiAdditionalMainStatPct != null}">
+                    <div class="addi-line" th:if="${node.tAtkFlat > 0 or node.tMagicFlat > 0}">
+                        <span th:text="${atkOrMagName}">공격력</span> : +<span
+                            th:text="${node.tAtkFlat + node.tMagicFlat}"></span>
+                    </div>
+                    <div class="addi-line" style="color:#aaa; font-size:11px; margin-top:5px;">
+                        (상세 수치는 기본 스탯에 합산됨)
+                    </div>
+                </th:block>
+            </div>
+
+        </div>
+    </div>
+
+    </div>
+    </div>
+
+</body>
+
+</html>

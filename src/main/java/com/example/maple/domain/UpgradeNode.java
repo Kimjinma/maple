@@ -97,6 +97,9 @@ public class UpgradeNode {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

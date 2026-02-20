@@ -17,16 +17,15 @@ public class SetEffectPreset {
     @Column(nullable = false, unique = true)
     private String name; // 예: "3카 5앱", "3카 5아케인"
 
-    // 합산된 세트효과 수치 (사용자가 DB에 입력할 값)
 
     private int attackPower;
     private int magicPower;
 
-    private int mainStat; // 편의상 주스탯 (또는 올스탯과 분리)
+    private int mainStat;
     private int allStat;
 
     private int bossDamage; // %
-    private int ignoreDefense; // % (Note: 여러 줄일 경우 자체적으로 합산된 수치 or 단일 줄. 로직 단순화를 위해 단일값으로 관리 권장)
+    private int ignoreDefense;
     private int criticalDamage; // %
     private int damage; // %
 
