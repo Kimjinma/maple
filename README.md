@@ -36,3 +36,13 @@
 AWS EC2 환경에서 **Docker**를 이용해 구동 및 배포합니다.
 *(로컬 실행 시 `application.yml`에 Nexon API Key 및 DB 정보 설정이 필요합니다.)*
 
+
+```bash
+# 1. 프로젝트 빌드
+./gradlew clean build -x test
+
+# 2. Docker 이미지 빌드
+docker build -t maple-recommender .
+
+# 3. 컨테이너 백그라운드 실행 (포트 8080)
+docker run -d -p 8080:8080 maple-recommender
