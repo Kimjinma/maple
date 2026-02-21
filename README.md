@@ -6,7 +6,7 @@
 기술 스택
   - Backend: Java 17, Spring Boot, Spring Data JPA
 
-  - Database & Cache: MySQL / H2, Spring Cache (@Cacheable)
+  - Database & Cache: MariaDB / Spring Cache (@Cacheable)
 
   - Infra/DevOps: AWS EC2, Docker
 
@@ -38,12 +38,4 @@
  AWS EC2 환경에서 Docker를 이용해 구동 및 배포합니다.
 (로컬 실행 시 application.yml에 Nexon API Key 및 DB 정보 설정이 필요합니다.)
 
-Bash
- 1. 프로젝트 빌드
-  ./gradlew clean build -x test
 
- 2. Docker 이미지 빌드
-  docker build -t maple-recommender .
-
- 3. 컨테이너 백그라운드 실행
-  docker run -d -p 8080:8080 maple-recommender
