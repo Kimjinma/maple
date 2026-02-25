@@ -8,8 +8,7 @@
 ## 프로젝트 정보
 * **진행 기간:** 2025.12.15 ~ 2026.02.25
 * **참여 인원:** 1인 (개인 프로젝트)
-* **GitHub:** [https://github.com/Kimjinma/maple](https://github.com/Kimjinma/maple)
-* **Demo URL:** [http://54.180.24.126:8080/calculator](http://54.180.24.126:8080/calculator)
+* **배포 URL:** [http://54.180.24.126:8080/calculator](http://54.180.24.126:8080/calculator)
 
 ---
 
