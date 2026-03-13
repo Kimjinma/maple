@@ -1,4 +1,4 @@
-# 게임 장비 업그레이드 시뮬레이터 (Maple Item Recommender)
+# 게임 장비 업그레이드 시뮬레이터
 
 > **"가진 자본(메소)으로 어떤 아이템부터 바꾸는 게 가장 스펙업이 많이 될까?"**  
 > 유저들의 실제 고민에서 출발한 가성비 최적화 장비 추천 백엔드 서비스입니다.
@@ -12,7 +12,7 @@
 
 ---
 
-## 🛠 Skills & Tech Stack
+## Skills & Tech Stack
 * **Backend:** `Java 17`, `Spring Boot 3`, `Spring Data JPA`
 * **Database & Cache:** `MariaDB`, `Caffeine Cache (Spring @Cacheable)`
 * **Infra/DevOps:** `AWS EC2`, `Docker`
@@ -44,7 +44,7 @@
 <summary><b>3. 외부 API 의존성 극복 및 시스템 안정성 방어</b></summary>
 <div markdown="1"><br>
 
-* **인메모리 캐싱 도입:** 넥슨 API를 매번 실시간으로 호출하면 넥슨 서버의 속도 제한(Rate Limit)에 걸리거나 페이지 로딩 병목이 발생하는 문제가 있었습니다. `Spring @Cacheable` 계층을 도입하여 불필요한 중복 호출을 줄이고, 캐시 히트 시 응답 속도를 O(1) 수준으로 대폭 개선했습니다.
+* **인메모리 캐싱 도입:** 넥슨 API를 매번 실시간으로 호출하면 넥슨 서버의 속도 제한(Rate Limit)에 걸리거나 페이지 로딩 병목이 발생하는 문제가 있었습니다. Spring @Cacheable 계층을 도입하여 불필요한 중복 호출을 줄이고, 외부 네트워크 I/O 비용을 대폭 절감하여 선제적으로 Rate Limit 장애를 방어했습니다.
 * **전역 예외 처리:** 외부 서버(Nexon) 장애 상황 시, 내 서버 전체가 뻗지 않고 우아하게 실패(Graceful Failure)하도록 `@ControllerAdvice` 기반 Global Exception Handler를 구성해 가용성을 높였습니다.
 </div>
 </details>
