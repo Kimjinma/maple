@@ -1,9 +1,9 @@
-# 메이플스토리 장비 추천 시뮬레이터 (Maple Item Recommender)
+# 게임 장비 추천 시뮬레이터 (Maple Item Recommender)
 
 > **"가진 자본(메소)으로 어떤 아이템부터 바꾸는 게 가장 스펙업이 많이 될까?"**  
 > 유저들의 실제 고민에서 출발한 가성비 최적화 장비 추천 백엔드 서비스입니다.
 
-단순히 좋은 아이템을 나열하는 것을 넘어, **배낭 알고리즘(Knapsack Problem)**을 응용해 (상승 스탯 / 소모 비용) 효율이 가장 높은 최적의 아이템 조합을 계산합니다. **Nexon Open API**를 연동하여 유저 캐릭터의 현재 스펙과 착용 장비를 정밀하게 분석하고 시뮬레이션합니다.
+단순히 좋은 아이템을 나열하는 것을 넘어, **배낭 문제(Knapsack Problem) 형태**에 **그리디(Greedy) 알고리즘**을 적용해 (상승 스탯 / 소모 비용) 효율이 가장 높은 최적의 아이템 조합을 계산합니다. **Nexon Open API**를 연동하여 유저 캐릭터의 현재 스펙과 착용 장비를 정밀하게 분석하고 시뮬레이션합니다.
 
 ## 프로젝트 정보
 * **진행 기간:** 2025.12.15 ~ 2026.02.25
@@ -14,9 +14,9 @@
 
 ## 🛠 Skills & Tech Stack
 * **Backend:** `Java 17`, `Spring Boot 3`, `Spring Data JPA`
-* **Database & Cache:** `MariaDB`, `Spring Cache (@Cacheable)`
+* **Database & Cache:** `MariaDB`, `Caffeine Cache (Spring @Cacheable)`
 * **Infra/DevOps:** `AWS EC2`, `Docker`
-* **External API/Tool:** `Nexon Open API`, `Swagger`
+* **External API/Tool:** `Nexon Open API`, `Springdoc OpenAPI (Swagger UI)`
 
 ---
 
@@ -32,7 +32,7 @@
 </details>
 
 <details>
-<summary><b>2. 가성비 기반 장비 추천 알고리즘 설계 (Knapsack Problem 적용)</b></summary>
+<summary><b>2. 가성비 기반 장비 추천 알고리즘 설계 (Greedy 알고리즘 + 휴리스틱 적용)</b></summary>
 <div markdown="1"><br>
 
 * **우선순위 선별:** 장착 가능한 장비 데이터(DB) 중 가격 대비 점수 상승량이 가장 높은 아이템을 우선적으로 선별합니다.
@@ -45,7 +45,7 @@
 <div markdown="1"><br>
 
 * **인메모리 캐싱 도입:** 넥슨 API를 매번 실시간으로 호출하면 넥슨 서버의 속도 제한(Rate Limit)에 걸리거나 페이지 로딩 병목이 발생하는 문제가 있었습니다. `Spring @Cacheable` 계층을 도입하여 불필요한 중복 호출을 줄이고, 캐시 히트 시 응답 속도를 O(1) 수준으로 대폭 개선했습니다.
-* **전역 예외 처리:** 외부 서버(Nexon) 장애 상황 시, 내 서버 전체가 뻗지 않고 우아하게 실패(Graceful Failure)하도록 `@RestControllerAdvice` 기반 Global Exception Handler를 구성해 가용성을 높였습니다.
+* **전역 예외 처리:** 외부 서버(Nexon) 장애 상황 시, 내 서버 전체가 뻗지 않고 우아하게 실패(Graceful Failure)하도록 `@ControllerAdvice` 기반 Global Exception Handler를 구성해 가용성을 높였습니다.
 </div>
 </details>
 
@@ -66,19 +66,17 @@
 <summary><b>확장성을 고려한 스키마 설계 및 향후 개선 목표 (OCP 달성)</b></summary>
 <div markdown="1"><br>
 
-* **무보엠(무기/보조/엠블렘) 확장 대비:** 현재 시뮬레이션은 방어구와 장신구 위주로 구축되어 있으나, 핵심 스펙인 `공격력 %` 및 `마력 %` 컬럼을 선제적으로 DB 스키마와 엔티티에 촘촘히 설계해 두었습니다. 향후 아키텍처 구조의 대규도 변경 없이 무보엠 추천 로직을 즉각 붙일 수 있는 확장성을 확보했습니다.
+* **무보엠(무기/보조/엠블렘) 확장 대비:** 현재 시뮬레이션은 방어구와 장신구 위주로 구축되어 있으나, 핵심 스펙인 `공격력 %` 및 `마력 %` 컬럼을 선제적으로 DB 스키마와 엔티티에 촘촘히 설계해 두었습니다. 향후 아키텍처 구조의 대규모 변경 없이 무보엠 추천 로직을 즉각 붙일 수 있는 확장성을 확보했습니다.
 * **비즈니스 로직 리팩토링 목표:** 현재 서비스 레이어에 잔존하는 `contains("파프니르")`와 같은 문자열 파싱과 하드코딩 분기(if-else)를, 향후 서버 기동 시 정적 `Enum`과 `Map`을 이용해 메모리에 구조화하는 방식으로 개편할 예정입니다. 신규 세트 장비가 추가되더라도 핵심 내부 로직은 수정할 필요가 없는 **개방-폐쇄 원칙(OCP)** 달성을 목표로 고도화 중입니다.
 </div>
 </details>
 
 ---
 
-
-##  배포 및 실행 방법 (How to run)
+## 배포 및 실행 방법 (How to run)
 
 AWS EC2 환경에서 **Docker**를 이용해 구동 및 배포합니다.
 *(로컬 실행 시 `application.yml`에 Nexon API Key 및 DB 정보 설정이 필요합니다.)*
-
 
 ```bash
 # 1. 프로젝트 빌드
@@ -89,3 +87,4 @@ docker build -t maple-recommender .
 
 # 3. 컨테이너 백그라운드 실행 (포트 8080)
 docker run -d -p 8080:8080 maple-recommender
+```
