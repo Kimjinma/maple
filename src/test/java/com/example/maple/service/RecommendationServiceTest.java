@@ -64,7 +64,6 @@ class RecommendationServiceTest {
                 when(characterService.getItemOptionSummary(any(), any())).thenReturn(
                                 new ItemOptionSummaryResponse(null, null, 0, 0, 0, 0, Collections.emptyMap()));
 
-                // 2. Mock Items
                 // 440억
                 UpgradeNode pitch22 = new UpgradeNode();
                 pitch22.setId(1L);
@@ -73,7 +72,6 @@ class RecommendationServiceTest {
                 pitch22.setCostMeso(440_000_000_000L);
                 pitch22.setTMainStatFlat(50);
 
-                // Dawn Boss: Low Cost (20억)
                 UpgradeNode dawn22 = new UpgradeNode();
                 dawn22.setId(2L);
                 dawn22.setItemName("가디언 엔젤 링");

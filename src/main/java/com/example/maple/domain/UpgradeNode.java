@@ -24,8 +24,6 @@ public class UpgradeNode {
     @Column(nullable = false, length = 50)
     private String slot;
 
-    @Column(name = "seat")
-    private Integer seat;
 
     @Column(name = "exclusive_group", length = 50)
     private String exclusiveGroup;
@@ -36,8 +34,6 @@ public class UpgradeNode {
     @Column(name = "starforce")
     private Integer starforce;
 
-    @Column(name = "set_key", length = 50)
-    private String setKey;
 
     // ===== 환산 영향 스펙(목표치) =====
     @Column(name = "t_main_stat_pct", nullable = false)
@@ -61,20 +57,8 @@ public class UpgradeNode {
     @Column(name = "t_magic_flat", nullable = false)
     private int tMagicFlat;
 
-    @Column(name = "t_boss_pct", nullable = false)
-    private double tBossPct;
-
-    @Column(name = "t_dmg_pct", nullable = false)
-    private double tDmgPct;
-
-    @Column(name = "t_ied_pct", nullable = false)
-    private double tIedPct;
-
     @Column(name = "t_cdmg_pct", nullable = false)
     private double tCdmgPct;
-
-    @Column(name = "t_cooldown_sec", nullable = false)
-    private int tCooldownSec;
 
     @Column(name = "cost_meso", nullable = false)
     private long costMeso;
@@ -99,6 +83,9 @@ public class UpgradeNode {
 
     @Column(name = "image_url", length = 512)
     private String imageUrl;
+
+    @Column(name = "set_group", length = 50)
+    private String setGroup;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;

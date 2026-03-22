@@ -31,6 +31,7 @@ public record ItemOptionSummaryResponse(
                         double bossDamage,
                         double damage,
                         double ignoreDefense,
-                        double criticalDamage) {
+                        double criticalDamage,
+                        boolean isSeedRing) {
         }
 }

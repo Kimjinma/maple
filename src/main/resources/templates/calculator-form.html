@@ -75,6 +75,17 @@
 
     <div class="container">
         <h2>🍁 스펙 업그레이드 계산기</h2>
+
+        <div class="info-box"
+            style="background: rgba(42, 42, 42, 0.8); border: 1px solid #ffcc00; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #ddd; text-align: left; line-height: 1.5; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #fff;">💡 처음 오셨나요?</div>
+            시뮬레이션 체험을 원하시면 버튼을 클릭하세요!
+            <button type="button" onclick="fillExample()"
+                style="margin-top: 10px; padding: 8px; font-size: 13px; background: rgba(255, 204, 0, 0.1); border: 1px dashed #ffcc00; color: #ffcc00; cursor: pointer; border-radius: 4px;">
+                ✨ 자동 입력 (규화설 / 20000 → 70000)
+            </button>
+        </div>
+
         <div th:if="${errorMessage}" style="color: #ff6b6b; margin-bottom: 15px; font-weight: bold;">
             ⚠️ <span th:text="${errorMessage}">오류 메시지</span>
         </div>
@@ -95,6 +106,13 @@
         </form>
     </div>
 
+    <script>
+        function fillExample() {
+            document.getElementById('name').value = '규화설';
+            document.getElementById('currentScore').value = '20000';
+            document.getElementById('targetScore').value = '70000';
+        }
+    </script>
 </body>
 
 </html>

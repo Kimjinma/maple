@@ -147,6 +147,13 @@ public class CharacterService {
                 itemIed = toDoubleSafe(eq.item_total_option().ignore_monster_armor());
             }
 
+            // 시드링(특수반지) 교체 방지 로직
+            boolean isSeedRing = (eq.special_ring_level() != null && eq.special_ring_level() > 0)
+                    || (eq.item_name() != null && (eq.item_name().contains("리스트레인트") || eq.item_name().contains("웨폰퍼프")
+                            || eq.item_name().contains("오라웨폰") || eq.item_name().contains("크라이시스")
+                            || eq.item_name().contains("컨티뉴어스")
+                            || eq.item_name().contains("링마스터")));
+
             slotOptions.put(eq.item_equipment_slot(), new ItemOptionSummaryResponse.SlotOption(
                     eq.item_name(),
                     itemMainPct + itemAllPct,
@@ -158,8 +165,8 @@ public class CharacterService {
                     itemBoss,
                     itemDmg,
                     itemIed,
-                    0.0 // CritDmg (API total option usually zero for items)
-            ));
+                    0.0, // 아이템에 직접 붙는 크뎀 옵션은 보통 0
+                    isSeedRing));
         }
 
         return new ItemOptionSummaryResponse(

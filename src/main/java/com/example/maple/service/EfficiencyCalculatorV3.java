@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 @Component
 public class EfficiencyCalculatorV3 {
 
-    private double bossDefRatio = 3.8; // default 380 (Kalos/Kaling standard)
+    private double bossDefRatio = 3.8; // 보스 방어율 기본값 (칼로스/카링 기준 380%)
 
     @Autowired
     public EfficiencyCalculatorV3() {
@@ -87,9 +87,10 @@ public class EfficiencyCalculatorV3 {
             s.allStatPct += dAllstatPct;
             s.finalDamagePct += dFinalDmgPct;
             s.critDamagePct += dCdmgPct;
+            s.allStatPct += dAllstatPct;
 
-            s.mainStatValue += dMainFlat;
-            s.attackValue += dAtkFlat;
+            s.addedMainFlat += dMainFlat;
+            s.addedAtkFlat += dAtkFlat;
         }, w);
 
         if (Math.abs(dIedPct) > 1e-12) {
@@ -121,38 +122,42 @@ public class EfficiencyCalculatorV3 {
         double p1 = powerNoIed(s1, w);
 
         double gain = (p1 / p0) - 1.0;
-        if (Double.isNaN(gain) || Double.isInfinite(gain) || gain < -1.0) {
-
-        }
         return baseR * k * gain;
     }
 
     private double powerNoIed(Snapshot s, Weights w) {
-        // Floor stats to prevent division by zero or negative power
-        double main = Math.max(10.0, s.mainStatValue);
-        double sub = Math.max(1.0, s.subStatValue);
-        double atk = Math.max(10.0, s.attackValue);
+        // Approximate True Base Main Stat
+        double initialStatPctTotal = 130.0 + s.initialMainPctOnly + s.initialAllStatPct * w.wAll;
+        double trueMainBase = s.initialFinalMain / (1.0 + initialStatPctTotal / 100.0);
 
-        // 보공 가중 (최소 1.0)
+        // New Final Main Stat
+        double currentStatPctTotal = 130.0 + s.mainStatPctOnly + s.allStatPct * w.wAll;
+        double finalMain = (trueMainBase + s.addedMainFlat) * (1.0 + currentStatPctTotal / 100.0);
+
+        double main = Math.max(10.0, finalMain);
+        double sub = Math.max(1.0, s.subStatValue);
+
+        // Approximate True Base Atk
+        double initialAtkPctTotal = 100.0 + s.initialAtkPct * w.wAtk;
+        double trueAtkBase = s.initialFinalAtk / (1.0 + initialAtkPctTotal / 100.0);
+
+        // New Final Atk
+        double currentAtkPctTotal = 100.0 + s.atkPct * w.wAtk;
+        double finalAtk = (trueAtkBase + s.addedAtkFlat) * (1.0 + currentAtkPctTotal / 100.0);
+
+        double atk = Math.max(10.0, finalAtk);
+
+        // 보공/뎀 가중 (최소 1.0)
         double D = Math.max(1.0, 1.0 + (s.damagePct + s.bossDamagePct * w.wBoss) / 100.0);
 
         // 최종뎀 배율 (최소 1.0)
         double F = Math.max(1.0, 1.0 + s.finalDamagePct / 100.0);
 
-        // 주스탯/올스탯 분리
-        double statPctTotal = s.mainStatPctOnly + s.allStatPct * w.wAll;
-
-        double A = atk * (1.0 + (s.atkPct / 100.0) * w.wAtk);
-        double S = (main + 0.10 * sub) * (1.0 + (statPctTotal / 100.0) * w.wStat);
-
-        double C = 1.0 + (s.critDamagePct / 100.0) * w.wCdmg;
-
-        return (A * S * D * F * C) / 1e12;
+        return (main * 4.0 + sub) * atk * D * F * (1.0 + s.critDamagePct * w.wCdmg / 100.0);
     }
 
     private double calcIed1(int baseR, double k, double iedPct, double wIed) {
-        // [FIX] "1% IED" option behaves multiplicatively, not additively.
-        // New IED = 1 - (1 - Current) * (1 - 0.01)
+
         double i0 = clamp01(iedPct / 100.0);
         double i1 = 1.0 - (1.0 - i0) * 0.99;
 
@@ -164,9 +169,6 @@ public class EfficiencyCalculatorV3 {
         double m0 = 1.0 - bossDefRatio * (1.0 - ied0);
         double m1 = 1.0 - bossDefRatio * (1.0 - ied1);
 
-        // If the character does zero damage due to low IED, use a small floor (0.01)
-        // instead of 1e-6
-        // to prevent astronomical gains while still acknowledging IED is valuable.
         if (m0 < 0.01)
             m0 = 0.01;
         if (m1 < 0.01)
@@ -184,7 +186,7 @@ public class EfficiencyCalculatorV3 {
 
         final double wAtk;
         final double wStat;
-        final double wAll; //
+        final double wAll;
         final double wCdmg;
         final double wBoss;
         final double wIed;
@@ -212,9 +214,7 @@ public class EfficiencyCalculatorV3 {
 
         static Weights fromBaseR(int baseR) {
 
-            double rr = Math.max(1000.0, baseR);
-
-            double k = 0.35;
+            double k = 0.4;
 
             double wAtk = 1.0;
             double wBoss = 1.0;
@@ -232,6 +232,19 @@ public class EfficiencyCalculatorV3 {
     }
 
     private static final class Snapshot {
+        // Approximate True Base values Tracking
+        double initialFinalMain;
+        double initialFinalAtk;
+
+        double initialMainPctOnly;
+        double initialAllStatPct;
+        double initialAtkPct;
+
+        double addedMainFlat;
+        double addedAtkFlat;
+
+        // Final stat fields (legacy, used for some logic where needed, but powerNoIed
+        // uses above)
         double mainStatValue;
         double subStatValue;
         double attackValue;
@@ -249,6 +262,15 @@ public class EfficiencyCalculatorV3 {
         static Snapshot from(CharacterCalcInput c, DetailStatResponse d, boolean isMage) {
             Snapshot s = new Snapshot();
 
+            s.initialFinalMain = d.mainStat();
+            s.initialFinalAtk = isMage ? d.magicPower() : d.attackPower();
+            s.initialMainPctOnly = c.mainStatPct();
+            s.initialAllStatPct = c.allStatPct();
+            s.initialAtkPct = isMage ? c.magicPct() : c.attackPct();
+
+            s.addedMainFlat = 0;
+            s.addedAtkFlat = 0;
+
             s.mainStatValue = d.mainStat();
             s.subStatValue = d.subStat();
             s.attackValue = isMage ? d.magicPower() : d.attackPower();
@@ -261,13 +283,22 @@ public class EfficiencyCalculatorV3 {
 
             s.mainStatPctOnly = c.mainStatPct();
             s.allStatPct = c.allStatPct();
-
             s.atkPct = isMage ? c.magicPct() : c.attackPct();
+
             return s;
         }
 
         Snapshot copy() {
             Snapshot t = new Snapshot();
+
+            t.initialFinalMain = this.initialFinalMain;
+            t.initialFinalAtk = this.initialFinalAtk;
+            t.initialMainPctOnly = this.initialMainPctOnly;
+            t.initialAllStatPct = this.initialAllStatPct;
+            t.initialAtkPct = this.initialAtkPct;
+            t.addedMainFlat = this.addedMainFlat;
+            t.addedAtkFlat = this.addedAtkFlat;
+
             t.mainStatValue = this.mainStatValue;
             t.subStatValue = this.subStatValue;
             t.attackValue = this.attackValue;
@@ -281,6 +312,7 @@ public class EfficiencyCalculatorV3 {
             t.mainStatPctOnly = this.mainStatPctOnly;
             t.allStatPct = this.allStatPct;
             t.atkPct = this.atkPct;
+
             return t;
         }
     }
