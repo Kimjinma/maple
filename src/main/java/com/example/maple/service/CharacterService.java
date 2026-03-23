@@ -165,7 +165,7 @@ public class CharacterService {
                     itemBoss,
                     itemDmg,
                     itemIed,
-                    0.0, // 아이템에 직접 붙는 크뎀 옵션은 보통 0
+                    0.0, 
                     isSeedRing));
         }
 
