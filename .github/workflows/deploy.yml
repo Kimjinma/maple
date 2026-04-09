@@ -21,12 +21,7 @@ jobs:
         java-version: '17' # 진용님 자바 버전
         distribution: 'temurin'
 
-    - name: 3-1. 운영 설정 파일 생성
-      run: |
-        mkdir -p ./src/main/resources
-        echo "${{ secrets.PROD_PROPERTIES }}" > ./src/main/resources/application-prod.properties
-
-    - name: 3-2. 스프링 프로젝트 빌드
+    - name: 3. 스프링 프로젝트 빌드
       run: |
         chmod +x ./gradlew
         ./gradlew clean build -x test
