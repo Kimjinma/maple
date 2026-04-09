@@ -21,7 +21,12 @@ jobs:
         java-version: '17' # 진용님 자바 버전
         distribution: 'temurin'
 
-    - name: 3. 스프링 프로젝트 빌드
+    - name: 3-1. 운영 설정 파일 생성
+      run: |
+        mkdir -p ./src/main/resources
+        echo "${{ secrets.PROD_PROPERTIES }}" > ./src/main/resources/application-prod.properties
+
+    - name: 3-2. 스프링 프로젝트 빌드
       run: |
         chmod +x ./gradlew
         ./gradlew clean build -x test
@@ -68,7 +73,10 @@ jobs:
           sudo docker pull ${{ secrets.DOCKER_USERNAME }}/maple-server:latest
           sudo docker stop maple || true
           sudo docker rm maple || true
-          sudo docker run -d --name maple -p 8080:8080 -v /home/ubuntu/maple/images:/images ${{ secrets.DOCKER_USERNAME }}/maple-server:latest
+          sudo docker run -d --name maple -p 8080:8080 \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -v /home/ubuntu/maple/images:/images \
+            ${{ secrets.DOCKER_USERNAME }}/maple-server:latest
 
     - name: 10. [문 닫기] AWS 보안 그룹 22번 포트 차단 복구
       if: always() # 배포가 성공하든 실패하든 문은 무조건 닫음!
