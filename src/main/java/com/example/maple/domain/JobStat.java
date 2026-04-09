@@ -37,7 +37,6 @@ public enum JobStat {
     private final String mainStat;
     @Getter
     private final String subStat;
-
     @Getter
     private final AtkType atkType;
 

@@ -5,6 +5,7 @@ import com.example.maple.dto.CharacterBasicResponse; // ✅ 추가
 import com.example.maple.dto.item.ItemStat;
 import com.example.maple.dto.ocid.OcidResponse;
 import com.example.maple.dto.stat.CharacterStatResponse;
+import com.example.maple.dto.seteffect.SetEffectResponse;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -62,12 +63,7 @@ public class NexonCachedService {
     }
 
     @Cacheable(cacheNames = "setEffect", key = "#ocid")
-    public com.example.maple.dto.seteffect.SetEffectResponse getSetEffect(String ocid) {
-        com.example.maple.dto.seteffect.SetEffectResponse all = nexonApiClient.getSetEffect(ocid);
-        if (all == null || all.setEffect() == null) {
-
-            return all;
-        }
-        return all;
+    public SetEffectResponse getSetEffect(String ocid) {
+        return nexonApiClient.getSetEffect(ocid);
     }
 }

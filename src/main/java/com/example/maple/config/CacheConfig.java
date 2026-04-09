@@ -18,7 +18,7 @@ public class CacheConfig {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(5, TimeUnit.MINUTES)); // TTL 5분 설정
+                .expireAfterWrite(5, TimeUnit.MINUTES));
         return cacheManager;
     }
 }

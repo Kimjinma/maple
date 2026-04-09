@@ -207,9 +207,21 @@
             margin-bottom: 4px;
         }
     </style>
+    <!-- 카카오 SDK & 로그인 공용스크립트 -->
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/1.43.0/kakao.min.js"></script>
+    <script src="/js/auth.js"></script>
 </head>
 
-<body>
+<body style="padding-top: 80px;">
+    <!-- 상단 네비게이션 바 -->
+    <nav style="position: absolute; top: 0; left: 0; width: 100%; padding: 15px 30px; background: #2a2a2a; border-bottom: 2px solid #ffcc00; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 1000;">
+        <div style="display: flex; gap: 30px; align-items: center;">
+            <a href="/calculator" style="color: #ffcc00; text-decoration: none; font-weight: bold; font-size: 18px;">🍁 시뮬레이터</a>
+            <a href="/board" style="color: #eee; text-decoration: none; font-weight: bold; font-size: 16px;">커뮤니티 게시판</a>
+        </div>
+        <!-- 우측 인증 UI 영역 -->
+        <div id="authArea"></div>
+    </nav>
 
     <div class="header-section">
         <h1>추천 장비 세팅 결과</h1>
