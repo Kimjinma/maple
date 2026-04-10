@@ -25,7 +25,7 @@ public class NexonCachedService {
         return name.trim();
     }
 
-    // @Cacheable(cacheNames = "ocid", key = "#name")
+    @Cacheable(cacheNames = "ocid", key = "#name")
     public String getOcid(String name) {
         String n = normalizeName(name);
         OcidResponse res = nexonApiClient.getOcid(n);
@@ -35,7 +35,7 @@ public class NexonCachedService {
         return res.ocid();
     }
 
-    // @Cacheable(cacheNames = "basic", key = "#ocid")
+    @Cacheable(cacheNames = "basic", key = "#ocid")
     public CharacterBasicResponse getBasic(String ocid) {
         CharacterBasicResponse basic = nexonApiClient.getBasic(ocid);
         if (basic == null) {
@@ -44,7 +44,7 @@ public class NexonCachedService {
         return basic;
     }
 
-    // @Cacheable(cacheNames = "stat", key = "#ocid")
+    @Cacheable(cacheNames = "stat", key = "#ocid")
     public CharacterStatResponse getStat(String ocid) {
         CharacterStatResponse stat = nexonApiClient.getStat(ocid);
         if (stat == null || stat.finalStat() == null) {
@@ -53,7 +53,7 @@ public class NexonCachedService {
         return stat;
     }
 
-    // @Cacheable(cacheNames = "item", key = "#ocid")
+    @Cacheable(cacheNames = "item", key = "#ocid")
     public ItemStat getItem(String ocid) {
         ItemStat item = nexonApiClient.getItemStat(ocid);
         if (item == null || item.itemequipment() == null) {
@@ -62,7 +62,7 @@ public class NexonCachedService {
         return item;
     }
 
-    // @Cacheable(cacheNames = "setEffect", key = "#ocid")
+    @Cacheable(cacheNames = "setEffect", key = "#ocid")
     public SetEffectResponse getSetEffect(String ocid) {
         return nexonApiClient.getSetEffect(ocid);
     }
