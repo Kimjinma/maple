@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 
 @Configuration
 @EnableWebSecurity
@@ -41,9 +42,9 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/api/characters/**",
                     "/api/calculator/**",
-                    "/calculator/**",
-                    "/actuator/**"
+                    "/calculator/**"
                 ).permitAll()
+                .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter,
