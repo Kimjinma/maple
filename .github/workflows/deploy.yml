@@ -56,7 +56,10 @@ jobs:
           --group-id ${{ secrets.AWS_SG_ID }} \
           --protocol tcp \
           --port 22 \
-          --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
+
+    - name: 보안 그룹 반영 대기
+      run: sleep 10
 
     - name: 9. EC2에 SSH 접속해서 새 버전 배포하기
       uses: appleboy/ssh-action@v0.1.10
@@ -64,14 +67,24 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        timeout: 60s
+        command_timeout: 10m
+        script_stop: true
         script: |
           sudo docker pull ${{ secrets.DOCKER_USERNAME }}/maple-server:latest || exit 1
+          
           sudo docker stop maple || true
           sudo docker rm maple || true
+          
+          sudo mkdir -p /home/ubuntu/maple/images
+          
           sudo docker run -d --name maple -p 8080:8080 \
             -e SPRING_PROFILES_ACTIVE=prod \
             -v /home/ubuntu/maple/images:/images \
             ${{ secrets.DOCKER_USERNAME }}/maple-server:latest
+            
+          sudo docker image prune -f
 
     - name: 10. [문 닫기] AWS 보안 그룹 22번 포트 차단 복구
       if: always() # 배포가 성공하든 실패하든 문은 무조건 닫음!
@@ -80,4 +93,4 @@ jobs:
           --group-id ${{ secrets.AWS_SG_ID }} \
           --protocol tcp \
           --port 22 \
-          --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
