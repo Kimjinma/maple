@@ -65,7 +65,7 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/maple-server:latest
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/maple-server:latest || exit 1
           sudo docker stop maple || true
           sudo docker rm maple || true
           sudo docker run -d --name maple -p 8080:8080 \
